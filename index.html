@@ -589,7 +589,7 @@ async function pushMonth(ym){
     return false;
   }
 }
-async function delMonth(ym){try{const r=await fetch(GS,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',month:ym}),redirect:'follow'});return!!(await r.json()).ok;}catch(e){return false;}}
+async function delMonth(ym){try{const r=await fetch(GS,{method:'POST',body:JSON.stringify({action:'delete',month:ym}),redirect:'follow'});return!!(await r.json()).ok;}catch(e){return false;}}
 let data=loadLS();migrateLS();
 let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType();
 function loadLS(){try{const r=localStorage.getItem(keyLS);return r?JSON.parse(r):{}}catch(e){return{}}}
