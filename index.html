@@ -579,17 +579,15 @@ async function pushMonth(ym){
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
   try{
-    const r=await fetch(GS,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}}),redirect:'follow'});
-    const ok=!!(await r.json()).ok;
-    if(dot){dot.classList.remove('syncing','error');if(!ok)dot.classList.add('error');}
-    return ok;
+    const r=await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}})});
+    if(dot)dot.classList.remove('syncing','error');
+    return true;
   }catch(e){
     if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
     return false;
   }
 }
-async function delMonth(ym){try{const r=await fetch(GS,{method:'POST',body:JSON.stringify({action:'delete',month:ym}),redirect:'follow'});return!!(await r.json()).ok;}catch(e){return false;}}
+async function delMonth(ym){try{await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'delete',month:ym})});return true;}catch(e){return false;}}
 let data=loadLS();migrateLS();
 let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType();
 function loadLS(){try{const r=localStorage.getItem(keyLS);return r?JSON.parse(r):{}}catch(e){return{}}}
@@ -614,8 +612,7 @@ async function pushUICloud(){
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
   try{
-    await fetch(GS,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'upsert',month:UI_KEY,cuentas:{config:{tipo:JSON.stringify(capUI()),valor:0,aport:0}}}),redirect:'follow'});
+    await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upsert',month:UI_KEY,cuentas:{config:{tipo:JSON.stringify(capUI()),valor:0,aport:0}}})};
     if(dot)dot.classList.remove('syncing','error');
   }catch(_){
     if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
