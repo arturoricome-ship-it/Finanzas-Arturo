@@ -569,12 +569,7 @@ const mBetween=(a,b)=>{const o=[];let c=a;while(c<=b){o.push(c);c=addM(c,1)}retu
 const legacyKeys=['arturo_inversiones','arturo_inversiones_v1','arturo_inversiones_v2','inversiones_arturo','seguimiento_inversiones'];
 const looksLike=obj=>!!(obj&&typeof obj==='object'&&Object.keys(obj).some(k=>/^\d{4}-\d{2}$/.test(k)&&obj[k]&&typeof obj[k].cuentas==='object'));
 const GS='https://script.google.com/macros/s/AKfycbyVSxYkRRa4WeSmx-MGuBMqg6JDNMrH_EyP7-x1tDWPtk_rT3K0wmUrWezapY7vrIsy/exec';
-async function fetchSheets(){try{
-  const r=await fetch(GS+'?action=getAll',{method:'GET',cache:'no-store',redirect:'follow'});
-  if(!r.ok)throw 0;
-  const j=await r.json();
-  if(j&&typeof j==='object'){data=j;saveLS();return true;}
-}catch(e){}return false;}
+async function fetchSheets(){try{const r=await fetch(GS+'?action=getAll',{method:'GET',cache:'no-store',redirect:'follow'});if(!r.ok)throw 0;const j=await r.json();if(j&&typeof j==='object'){data=j;saveLS();return true;}}catch(e){}return false;}
 async function pushMonth(ym){
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
@@ -612,7 +607,7 @@ async function pushUICloud(){
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
   try{
-    await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upsert',month:UI_KEY,cuentas:{config:{tipo:JSON.stringify(capUI()),valor:0,aport:0}}})};
+    await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upsert',month:UI_KEY,cuentas:{config:{tipo:JSON.stringify(capUI()),valor:0,aport:0}}})});
     if(dot)dot.classList.remove('syncing','error');
   }catch(_){
     if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
