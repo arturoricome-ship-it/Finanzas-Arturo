@@ -17,12 +17,62 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
+
+// Guardado global del estado visual entre dispositivos.
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.matches('input,select')) saveUI();
+}, true);
+window.addEventListener('pagehide', ()=>saveUI(true));
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
+
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js">
+// Guardado global del estado visual entre dispositivos.
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.matches('input,select')) saveUI();
+}, true);
+window.addEventListener('pagehide', ()=>saveUI(true));
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js">
+// Guardado global del estado visual entre dispositivos.
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.matches('input,select')) saveUI();
+}, true);
+window.addEventListener('pagehide', ()=>saveUI(true));
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js">
+// Guardado global del estado visual entre dispositivos.
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.matches('input,select')) saveUI();
+}, true);
+window.addEventListener('pagehide', ()=>saveUI(true));
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+// Guardado global del estado visual entre dispositivos.
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.matches('input,select')) saveUI();
+}, true);
+window.addEventListener('pagehide', ()=>saveUI(true));
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
+
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -606,38 +656,75 @@ async function fetchSheets(){
     document.head.appendChild(script);
   });
 }
+function postToAppsScript(payload){
+  if(!cloudReady()) return Promise.resolve(false);
+  return new Promise(resolve=>{
+    try{
+      const iframeName='gs_iframe_'+Date.now()+'_'+Math.random().toString(16).slice(2);
+      const iframe=document.createElement('iframe');
+      iframe.name=iframeName;
+      iframe.style.display='none';
+      document.body.appendChild(iframe);
+
+      const form=document.createElement('form');
+      form.method='POST';
+      form.action=GS;
+      form.target=iframeName;
+      form.enctype='application/x-www-form-urlencoded';
+      form.style.display='none';
+
+      const input=document.createElement('input');
+      input.type='hidden';
+      input.name='payload';
+      input.value=JSON.stringify(payload);
+      form.appendChild(input);
+      document.body.appendChild(form);
+
+      let done=false;
+      const cleanup=()=>{
+        try{form.remove();}catch(_){ }
+        try{iframe.remove();}catch(_){ }
+      };
+      iframe.onload=()=>{
+        if(done) return;
+        done=true;
+        setTimeout(cleanup,200);
+        resolve(true);
+      };
+      form.submit();
+      setTimeout(()=>{
+        if(done) return;
+        done=true;
+        cleanup();
+        resolve(true); // el envío puede haberse hecho aunque Google no permita leer respuesta
+      },8000);
+    }catch(e){
+      console.error('postToAppsScript error',e);
+      resolve(false);
+    }
+  });
+}
 async function pushMonth(ym){
   if(!cloudReady()) return false;
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
-  try{
-    const r=await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}})});
-    if(dot)dot.classList.remove('syncing','error');
-    return true;
-  }catch(e){
-    if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
-    return false;
-  }
+  const ok=await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}});
+  if(dot)dot.classList.remove('syncing','error');
+  if(!ok&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+  return ok;
 }
-async function delMonth(ym){if(!cloudReady()) return false;try{await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'delete',month:ym})});return true;}catch(e){return false;}}
+async function delMonth(ym){
+  if(!cloudReady()) return false;
+  return postToAppsScript({action:'delete',month:ym});
+}
 async function pushAllCloud(){
   if(!cloudReady()) return false;
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
-  try{
-    await fetch(GS,{
-      method:'POST',
-      mode:'no-cors',
-      keepalive:false,
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'saveAll',data:data})
-    });
-    if(dot)dot.classList.remove('syncing','error');
-    return true;
-  }catch(e){
-    if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
-    return false;
-  }
+  const ok=await postToAppsScript({action:'saveAll',data:data});
+  if(dot)dot.classList.remove('syncing','error');
+  if(!ok&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+  return ok;
 }
 
 let data=loadLS();migrateLS();
@@ -653,7 +740,21 @@ function saveType(){localStorage.setItem(keyTypePref,JSON.stringify(typePref));}
 function cloudReady(){return typeof GS==='string' && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(GS);}
 function migrateLS(){if(looksLike(data))return;for(const k of legacyKeys){try{const r=localStorage.getItem(k);if(!r)continue;const p=JSON.parse(r);if(looksLike(p)){data=p;saveLS();return;}}catch(_){}}}
 const UI_KEY='__ui_state__';let _uiT=null;
-function capUI(){return{ts:Date.now(),tab:document.querySelector('.nitem.on')?.dataset.tab||'dashboard',rangeMode:document.getElementById('rangeMode')?.value||'all',yearOnly:document.getElementById('yearOnly')?.value||'',fromMonth:document.getElementById('fromMonth')?.value||'',toMonth:document.getElementById('toMonth')?.value||'',rendMode:document.getElementById('rendMode')?.value||'ex',incVivHip:document.getElementById('incVivHip')?.checked??true,selMap,hidden:Array.from(hiddenSet)};}
+function capUI(){return{
+  ts:Date.now(),
+  tab:document.querySelector('.nitem.on')?.dataset.tab||'dashboard',
+  rangeMode:document.getElementById('rangeMode')?.value||'all',
+  yearOnly:document.getElementById('yearOnly')?.value||'',
+  fromMonth:document.getElementById('fromMonth')?.value||'',
+  toMonth:document.getElementById('toMonth')?.value||'',
+  rendMode:document.getElementById('rendMode')?.value||'ex',
+  incVivHip:document.getElementById('incVivHip')?.checked??true,
+  editMonth:document.getElementById('editMonth')?.value||'',
+  privacy:document.body.classList.contains('privacy'),
+  sbCollapsed:document.body.classList.contains('sb-collapsed'),
+  selMap:JSON.parse(JSON.stringify(selMap||{})),
+  hidden:Array.from(hiddenSet||[])
+};}
 function saveUI(force=false){
   // Siempre guardar en localStorage inmediatamente
   try{localStorage.setItem(keyUI,JSON.stringify(capUI()));}catch(_){}
@@ -663,14 +764,14 @@ function saveUI(force=false){
 }
 async function pushUICloud(){
   if(!cloudReady()) return false;
+  const state=capUI();
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
-  try{
-    await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'upsert',month:UI_KEY,cuentas:{config:{tipo:JSON.stringify(capUI()),valor:0,aport:0}}})});
-    if(dot)dot.classList.remove('syncing','error');
-  }catch(_){
-    if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
-  }
+  let ok=await postToAppsScript({action:'saveUi',state});
+  if(!ok) ok=await postToAppsScript({action:'upsert',month:UI_KEY,cuentas:{config:{tipo:JSON.stringify(state),valor:0,aport:0}}});
+  if(dot)dot.classList.remove('syncing','error');
+  if(!ok&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+  return ok;
 }
 function applyUI(s){
   if(!s) return;
@@ -699,16 +800,28 @@ function applyUI(s){
   try { if(ui.ivh) ui.ivh.checked=s.incVivHip??true; } catch(_) {}
   try { if(s.selMap&&typeof s.selMap==='object'){selMap=s.selMap;saveSel();} } catch(_) {}
   try { if(Array.isArray(s.hidden)){hiddenSet=new Set(s.hidden);saveHidden();} } catch(_) {}
+  try { if(ui.em&&s.editMonth) ui.em.value=s.editMonth; } catch(_) {}
+  try { document.body.classList.toggle('sb-collapsed', !!s.sbCollapsed); } catch(_) {}
+  try { document.body.classList.toggle('privacy', !!s.privacy); document.getElementById('btnEye')?.classList.toggle('on', !!s.privacy); } catch(_) {}
+}
+function extractUIState(obj){
+  if(!obj) return null;
+  try{
+    if(obj[UI_KEY]?.state) return obj[UI_KEY].state;
+    const old=obj[UI_KEY]?.cuentas?.config?.tipo;
+    if(old) return typeof old==='string'?JSON.parse(old):old;
+    if(obj[UI_KEY]?.tab || obj[UI_KEY]?.selMap) return obj[UI_KEY];
+  }catch(_){ }
+  return null;
 }
 function restoreUI(){
   let local=null, cloud=null;
   try { const r=localStorage.getItem(keyUI); if(r) local=JSON.parse(r); } catch(_){}
-  try { const cr=data[UI_KEY]?.cuentas?.config?.tipo; if(cr) cloud=JSON.parse(cr); } catch(_){}
-  // Usar el estado más reciente según timestamp
+  try { cloud=extractUIState(data); } catch(_){}
   let state=null;
-  if(local&&cloud)  state=(local.ts||0)>=(cloud.ts||0)?local:cloud;
+  if(local&&cloud)  state=(Number(local.ts)||0)>=(Number(cloud.ts)||0)?local:cloud;
   else              state=local||cloud;
-  if(state) applyUI(state);
+  if(state){ applyUI(state); try{localStorage.setItem(keyUI,JSON.stringify(state));}catch(_){} }
 }
 
 document.addEventListener('DOMContentLoaded',async()=>{
@@ -1103,7 +1216,7 @@ function importJSON(file){
       if(cloudReady()){
         const ok=await pushAllCloud();
         await pushUICloud();
-        alert(ok?'Datos importados y enviados a Google Sheets. Espera unos segundos y recarga el Sheet.':'Datos importados en la web, pero no se han podido enviar a Google Sheets. Revisa permisos del Apps Script.');
+        alert(ok?'Datos importados y enviados a Google Sheets. Espera 10-20 segundos y recarga el Sheet.':'Datos importados en la web, pero no se han podido enviar a Google Sheets. Revisa permisos del Apps Script.');
       }else{
         alert('Datos importados en la web. Falta URL /exec de Apps Script para guardar en Sheets.');
       }
@@ -1113,7 +1226,7 @@ function importJSON(file){
 }
 
 document.querySelectorAll('.nitem[data-tab]').forEach(item=>{item.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll('.nitem[data-tab]').forEach(i=>i.classList.remove('on'));document.querySelectorAll('.tpanel').forEach(p=>p.classList.remove('on'));item.classList.add('on');const panel=document.getElementById('tab-'+item.dataset.tab);if(panel)panel.classList.add('on');// Save immediately on tab change
-try{localStorage.setItem(keyUI,JSON.stringify(capUI()));}catch(_){}clearTimeout(_uiT);_uiT=setTimeout(()=>pushUICloud(),300);setTimeout(()=>Object.values(charts).forEach(c=>{try{c.resize()}catch(_){}}),50);});});
+saveUI(true);setTimeout(()=>Object.values(charts).forEach(c=>{try{c.resize()}catch(_){}}),50);});});
 
 // Header export buttons
 document.getElementById('btnExportH')?.addEventListener('click', exportExcel);
@@ -1121,7 +1234,7 @@ document.getElementById('btnExportJSONH')?.addEventListener('click', exportJSON)
 document.getElementById('btnImportH')?.addEventListener('click', () => document.getElementById('fileImportH').click());
 document.getElementById('fileImportH')?.addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if(f) importJSON(f); e.target.value=''; });
 
-(function(){const btn=document.getElementById('btnEye');if(!btn)return;let h=false;btn.addEventListener('click',()=>{h=!h;document.body.classList.toggle('privacy',h);btn.classList.toggle('on',h);btn.title=h?'Mostrar':'Ocultar importes';});})();
+(function(){const btn=document.getElementById('btnEye');if(!btn)return;let h=false;btn.addEventListener('click',()=>{h=!h;document.body.classList.toggle('privacy',h);btn.classList.toggle('on',h);btn.title=h?'Mostrar':'Ocultar importes';saveUI(true);});})();
 
 // ── SIDEBAR COLLAPSE & MOBILE ──────────────────────────────────────
 (function(){
@@ -1187,6 +1300,16 @@ window.addEventListener('beforeunload', () => {
 });
 
 function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCharts(s);buildAccountList(s);buildRanking();buildStatKPIs(s);buildHeatmap(s);buildComp(s);buildProj(s);makeSortable();}
+
+// Guardado global del estado visual entre dispositivos.
+document.addEventListener('change', e=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.matches('input,select')) saveUI();
+}, true);
+window.addEventListener('pagehide', ()=>saveUI(true));
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
+
 </script>
 </body>
 </html>

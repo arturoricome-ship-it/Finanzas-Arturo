@@ -1,5 +1,5 @@
 // Service Worker — Finanzas Arturo
-const CACHE = 'finanzas-v2';
+const CACHE = 'finanzas-v4-estado-global';
 const PRECACHE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
