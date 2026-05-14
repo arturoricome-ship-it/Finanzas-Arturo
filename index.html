@@ -620,6 +620,26 @@ async function pushMonth(ym){
   }
 }
 async function delMonth(ym){if(!cloudReady()) return false;try{await fetch(GS,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'delete',month:ym})});return true;}catch(e){return false;}}
+async function pushAllCloud(){
+  if(!cloudReady()) return false;
+  const dot=document.getElementById('syncDot');
+  if(dot)dot.classList.add('syncing');
+  try{
+    await fetch(GS,{
+      method:'POST',
+      mode:'no-cors',
+      keepalive:false,
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'saveAll',data:data})
+    });
+    if(dot)dot.classList.remove('syncing','error');
+    return true;
+  }catch(e){
+    if(dot){dot.classList.remove('syncing');dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+    return false;
+  }
+}
+
 let data=loadLS();migrateLS();
 let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType();
 function loadLS(){try{const r=localStorage.getItem(keyLS);return r?JSON.parse(r):{}}catch(e){return{}}}
@@ -815,7 +835,7 @@ function bindEvents(){
   document.getElementById('btnExportJSON').addEventListener('click',exportJSON);
   document.getElementById('btnImport').addEventListener('click',()=>document.getElementById('fileImport').click());
   document.getElementById('fileImport').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)importJSON(f);e.target.value='';});
-  document.getElementById('btnSyncCloud').addEventListener('click',async()=>{if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}const months=Object.keys(data).filter(k=>k!==UI_KEY);if(!months.length){alert('No hay datos.');return;}const btn=document.getElementById('btnSyncCloud');btn.textContent='⏳...';btn.disabled=true;let ok=0,fail=0;for(const ym of months){const r=await pushMonth(ym);r?ok++:fail++;}await pushUICloud();btn.textContent='☁️ Sincronizar';btn.disabled=false;alert(`${ok} meses sincronizados${fail?', '+fail+' fallaron':''}.`);});
+  document.getElementById('btnSyncCloud').addEventListener('click',async()=>{if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}const months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k));if(!months.length){alert('No hay datos.');return;}const btn=document.getElementById('btnSyncCloud');btn.textContent='⏳...';btn.disabled=true;const ok=await pushAllCloud();await pushUICloud();btn.textContent='☁️ Sincronizar';btn.disabled=false;alert(ok?`${months.length} meses enviados a Google Sheets.`:'No se pudo enviar a Google Sheets. Revisa que Apps Script esté desplegado como aplicación web: Ejecutar como Yo y acceso Cualquier usuario.');});
   document.getElementById('btnUnhide')?.addEventListener('click',()=>{if(!confirm('¿Restaurar cuentas ocultas?'))return;hiddenSet.clear();saveHidden();buildChecks();refreshAll();saveUI();});
   document.querySelector('#tabla tbody').onclick=async ev=>{const btn=ev.target.closest('button.dm[data-del]');if(!btn)return;const ym=btn.getAttribute('data-del');if(!ym||!confirm(`¿Eliminar ${ym}?`))return;delete data[ym];saveLS();await delMonth(ym);buildChecks();refreshAll();};
 }
@@ -1073,7 +1093,24 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 function exportExcel(){if(typeof XLSX==='undefined'){alert('SheetJS no disponible.');return;}const wb=XLSX.utils.book_new();const rows=[];const months=Object.keys(data).filter(k=>k!==UI_KEY).sort();const lV={};months.forEach(ym=>{const cs=data[ym]?.cuentas||{};for(const[n,it]of Object.entries(cs)){const tipo=it.tipo||'activo',valor=Number(it.valor)||0,aport=Number(it.aport)||0;const prev=(n in lV)?Number(lV[n]):NaN;let base=NaN;if(!isNaN(prev)){base=(document.getElementById('rendMode').value==='inc')?prev:(prev+aport);}let diff='',pct='';if(!isNaN(base)){diff=valor-base;pct=(base!==0)?(diff/base):'';}rows.push({fecha:ym,nombre:n,tipo,importe:valor,aportacion:aport,variacion:diff,rentab_pct:pct});lV[n]=valor;}});const wsMov=XLSX.utils.json_to_sheet(rows,{header:['fecha','nombre','tipo','importe','aportacion','variacion','rentab_pct']});XLSX.utils.book_append_sheet(wb,wsMov,'Movimientos');const s=calcSeries();const rM=s.labels.map((ym,i)=>({fecha:ym,patrimonio:s.pat[i]||0,aportaciones:s.ap[i]||0,subida_cartera:(i>0?(s.pat[i]-s.pat[i-1]):0),beneficio_mes:(isNaN(s.rEur[i])?0:s.rEur[i]),rentab_pct_mes:(isNaN(s.rPct[i])?'':s.rPct[i])}));const yMap={};s.labels.forEach((ym,i)=>{const y=ym.slice(0,4);if(!yMap[y])yMap[y]={anio:y,patrimonio_fin:0,aportaciones:0,beneficio:0};yMap[y].aportaciones+=Number(s.ap[i])||0;yMap[y].beneficio+=(isNaN(s.rEur[i])?0:s.rEur[i]);yMap[y].patrimonio_fin=s.pat[i]||0;});const rA=Object.values(yMap).sort((a,b)=>a.anio-b.anio).map(r=>({anio:r.anio,patrimonio_fin:r.patrimonio_fin,aportaciones:r.aportaciones,beneficio:r.beneficio,rentab_pct:r.aportaciones>0?(r.beneficio/r.aportaciones):''}));const wsRes=XLSX.utils.aoa_to_sheet([['Resumen'],[]]); XLSX.utils.sheet_add_json(wsRes,rM,{origin:'A3',header:['fecha','patrimonio','aportaciones','subida_cartera','beneficio_mes','rentab_pct_mes']});const sy=3+rM.length+3;XLSX.utils.sheet_add_aoa(wsRes,[['Anual']],{origin:`A${sy-1}`});XLSX.utils.sheet_add_json(wsRes,rA,{origin:`A${sy}`,header:['anio','patrimonio_fin','aportaciones','beneficio','rentab_pct']});XLSX.utils.book_append_sheet(wb,wsRes,'Resumen');XLSX.writeFile(wb,'inversiones_arturo.xlsx');}
 function exportJSON(){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='inversiones_arturo.json';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
-function importJSON(file){const reader=new FileReader();reader.onload=e=>{try{const p=JSON.parse(e.target.result);if(!looksLike(p)){alert('Formato no válido.');return;}data=p;saveLS();buildChecks();refreshAll();if(cloudReady()){Object.keys(data).filter(k=>k!==UI_KEY).sort().forEach(k=>pushMonth(k));pushUICloud();}alert('Datos importados.');}catch(err){alert('No se pudo leer el JSON.');}};reader.readAsText(file);}
+function importJSON(file){
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const p=JSON.parse(e.target.result);
+      if(!looksLike(p)){alert('Formato no válido.');return;}
+      data=p;saveLS();buildChecks();refreshAll();
+      if(cloudReady()){
+        const ok=await pushAllCloud();
+        await pushUICloud();
+        alert(ok?'Datos importados y enviados a Google Sheets. Espera unos segundos y recarga el Sheet.':'Datos importados en la web, pero no se han podido enviar a Google Sheets. Revisa permisos del Apps Script.');
+      }else{
+        alert('Datos importados en la web. Falta URL /exec de Apps Script para guardar en Sheets.');
+      }
+    }catch(err){alert('No se pudo leer el JSON.');}
+  };
+  reader.readAsText(file);
+}
 
 document.querySelectorAll('.nitem[data-tab]').forEach(item=>{item.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll('.nitem[data-tab]').forEach(i=>i.classList.remove('on'));document.querySelectorAll('.tpanel').forEach(p=>p.classList.remove('on'));item.classList.add('on');const panel=document.getElementById('tab-'+item.dataset.tab);if(panel)panel.classList.add('on');// Save immediately on tab change
 try{localStorage.setItem(keyUI,JSON.stringify(capUI()));}catch(_){}clearTimeout(_uiT);_uiT=setTimeout(()=>pushUICloud(),300);setTimeout(()=>Object.values(charts).forEach(c=>{try{c.resize()}catch(_){}}),50);});});
