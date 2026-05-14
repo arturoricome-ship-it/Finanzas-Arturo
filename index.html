@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Finanzas — Arturo</title>
 <!-- PWA -->
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#040911">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Finanzas">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
 </script>
@@ -570,42 +570,38 @@ const legacyKeys=['arturo_inversiones','arturo_inversiones_v1','arturo_inversion
 const looksLike=obj=>!!(obj&&typeof obj==='object'&&Object.keys(obj).some(k=>/^\d{4}-\d{2}$/.test(k)&&obj[k]&&typeof obj[k].cuentas==='object'));
 const GS='https://script.google.com/macros/s/AKfycbyVSxYkRRa4WeSmx-MGuBMqg6JDNMrH_EyP7-x1tDWPtk_rT3K0wmUrWezapY7vrIsy/exec';
 async function fetchSheets(){
-  try{
-    const r=await fetch(GS+'?action=getAll',{method:'GET',cache:'no-store',redirect:'follow'});
-    if(!r.ok) throw 0;
-    const j=await r.json();
-    if(!j||typeof j!=='object') throw 0;
-
-    const cloudMonths = Object.keys(j).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
-    const localMonths = Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
-
-    if(cloudMonths===0 && localMonths>0){
-      // Sheets vacío pero tenemos datos locales → no machacar, programar sync
-      console.log('Sheets vacío, conservando datos locales ('+localMonths+' meses)');
-      // Guardar UI state de cloud si existe
-      if(j[UI_KEY]) data[UI_KEY]=j[UI_KEY];
-      return false; // señal para que el caller haga push
-    } else if(cloudMonths>=localMonths){
-      // Cloud tiene igual o más datos → cloud gana (otro dispositivo ha guardado más)
-      data=j;
-      saveLS();
-      console.log('Datos cargados desde Sheets: '+cloudMonths+' meses');
-    } else {
-      // Local tiene más datos → merge: local gana en conflicto
-      Object.keys(j).forEach(k=>{ if(!data[k]) data[k]=j[k]; });
-      if(j[UI_KEY]) {
-        // UI state: usar el más reciente
-        try {
-          const lts=(data[UI_KEY]?.cuentas?.config?.tipo)?JSON.parse(data[UI_KEY].cuentas.config.tipo):{ts:0};
-          const cts=(j[UI_KEY]?.cuentas?.config?.tipo)?JSON.parse(j[UI_KEY].cuentas.config.tipo):{ts:0};
-          if((cts.ts||0)>(lts.ts||0)) data[UI_KEY]=j[UI_KEY];
-        } catch(_){}
+  return new Promise(resolve=>{
+    const cb='_gs_'+Date.now();
+    const script=document.createElement('script');
+    const tmt=setTimeout(()=>{
+      delete window[cb];try{document.head.removeChild(script);}catch(_){}
+      console.warn('fetchSheets timeout');resolve(false);
+    },10000);
+    window[cb]=function(j){
+      clearTimeout(tmt);delete window[cb];
+      try{document.head.removeChild(script);}catch(_){}
+      if(!j||typeof j!=='object'){resolve(false);return;}
+      const cm=Object.keys(j).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
+      const lm=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
+      if(cm===0&&lm>0){
+        console.log('Sheets vacío, conservando '+lm+' meses locales');
+        if(j[UI_KEY])data[UI_KEY]=j[UI_KEY];
+        resolve(false);
+      }else if(cm>=lm){
+        data=j;saveLS();
+        console.log('Sheets cargado: '+cm+' meses');
+        resolve(true);
+      }else{
+        Object.keys(j).forEach(k=>{if(!data[k])data[k]=j[k];});
+        saveLS();
+        console.log('Merge: local='+lm+' cloud='+cm);
+        resolve(true);
       }
-      saveLS();
-      console.log('Merge: local '+localMonths+' meses, cloud '+cloudMonths+' meses');
-    }
-    return true;
-  }catch(e){ console.warn('fetchSheets error:',e); return false; }
+    };
+    script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve(false);};
+    script.src=GS+'?action=getAll&callback='+cb;
+    document.head.appendChild(script);
+  });
 }
 async function pushMonth(ym){
   const dot=document.getElementById('syncDot');
