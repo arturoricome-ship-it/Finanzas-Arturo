@@ -832,7 +832,7 @@ body.metas-collapsed #metasCollapsedInfo{display:inline-flex}
 function updateLibWarn(){const w=document.getElementById('libWarn');const msgs=[];if(typeof Chart==='undefined')msgs.push('⚠️ Chart.js no cargado.');if(typeof XLSX==='undefined')msgs.push('⚠️ SheetJS no cargado.');w.textContent=msgs.join(' ');w.style.display=msgs.length?'block':'none';}
 const fmtEUR=v=>isNaN(v)?'–':v.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
 const fmtPct=v=>isNaN(v)?'–':(v*100).toFixed(2).replace('.',',')+' %';
-const keyLS='arturo_inversiones_v3',keySel='arturo_filtros_sel_v1',keyHidden='arturo_cuentas_ocultas_v1',keyTypePref='arturo_tipo_pref_v1',keyUI='arturo_ui_state_v1',keyCats='arturo_categorias_v1',keyGoals='arturo_metas_v1';
+const keyLS='arturo_inversiones_v3',keySel='arturo_filtros_sel_v1',keyHidden='arturo_cuentas_ocultas_v1',keyTypePref='arturo_tipo_pref_v1',keyUI='arturo_ui_state_v1',keyCats='arturo_categorias_v1',keyGoals='arturo_metas_v1',keyDeleted='arturo_meses_borrados_v1';
 const defaultCuentas=['Indexa Capital','Myinvestor','Degiro','Emergencia','Efectivo','Vivienda','Hipoteca','Préstamo','Fondo de Emergencia'];
 const defaultGoals=[
   {id:'g-first',name:'Primera inversión',kind:'manual',target:0,base:'patrimonio',done:false,system:true},
@@ -862,8 +862,11 @@ async function fetchSheets(){
       clearTimeout(tmt);delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
       if(!j||typeof j!=='object'){resolve(false);return;}
+      // Si este navegador ha borrado un mes recientemente, no dejamos que una copia antigua de Sheets lo resucite.
+      clearOldDeletedMonths();
+      Object.keys(j).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k)&&isMonthDeletedLocally(k)) delete j[k];});
       const cm=Object.keys(j).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
-      const lm=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
+      const lm=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).length;
       if(cm===0&&lm>0){
         console.log('Sheets vacío, conservando '+lm+' meses locales');
         if(j[UI_KEY])data[UI_KEY]=j[UI_KEY];
@@ -956,7 +959,7 @@ async function pushAllCloud(){
 }
 
 let data=loadLS();migrateLS();
-let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType(),customCats=loadCats(),goals=loadGoals();
+let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType(),customCats=loadCats(),goals=loadGoals(),deletedMonths=loadDeletedMonths();
 function loadLS(){try{const r=localStorage.getItem(keyLS);return r?JSON.parse(r):{}}catch(e){return{}}}
 function saveLS(){localStorage.setItem(keyLS,JSON.stringify(data));}
 function loadSel(){try{return JSON.parse(localStorage.getItem(keySel))||{}}catch(_){return{}}}
@@ -969,6 +972,11 @@ function loadCats(){try{return JSON.parse(localStorage.getItem(keyCats))||[]}cat
 function saveCats(){localStorage.setItem(keyCats,JSON.stringify(customCats));}
 function loadGoals(){try{const g=JSON.parse(localStorage.getItem(keyGoals));return Array.isArray(g)&&g.length?g:defaultGoals}catch(_){return defaultGoals}}
 function saveGoals(){localStorage.setItem(keyGoals,JSON.stringify(goals));}
+function loadDeletedMonths(){try{return JSON.parse(localStorage.getItem(keyDeleted))||{}}catch(_){return{}}}
+function saveDeletedMonths(){try{localStorage.setItem(keyDeleted,JSON.stringify(deletedMonths||{}));}catch(_){}}
+function markMonthDeleted(ym){if(!ym)return;deletedMonths[ym]=Date.now();saveDeletedMonths();}
+function isMonthDeletedLocally(ym){return !!(deletedMonths&&deletedMonths[ym]);}
+function clearOldDeletedMonths(){const now=Date.now(),ttl=1000*60*60*24*45;let changed=false;Object.keys(deletedMonths||{}).forEach(ym=>{if(now-Number(deletedMonths[ym])>ttl){delete deletedMonths[ym];changed=true;}});if(changed)saveDeletedMonths();}
 function cloudReady(){return typeof GS==='string' && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(GS);}
 function migrateLS(){if(looksLike(data))return;for(const k of legacyKeys){try{const r=localStorage.getItem(k);if(!r)continue;const p=JSON.parse(r);if(looksLike(p)){data=p;saveLS();return;}}catch(_){}}}
 const UI_KEY='__ui_state__';let _uiT=null;
@@ -1079,11 +1087,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
   try { sheetsHadData = await fetchSheets(); } catch(_) {}
   // Si Sheets estaba vacío pero tenemos datos locales → sincronizar automáticamente
   if(!sheetsHadData){
-    const localCount=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
+    const localCount=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).length;
     if(localCount>0){
       console.log('Auto-sync: empujando '+localCount+' meses a Sheets...');
       setTimeout(async()=>{
-        for(const ym of Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).sort()){
+        for(const ym of Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).sort()){
           await pushMonth(ym);
         }
         await pushUICloud();
@@ -1194,17 +1202,41 @@ async function saveCurrentMonth(silent=false,forcedYm=null){
   await pushUICloud();
   return true;
 }
+async function deleteMonthEverywhere(ym, opts={}){
+  if(!ym) return false;
+  clearTimeout(_autoSaveTimer);
+  _monthDirty=false;
+
+  // Borrado real: desaparece del historial, de gráficos, de distribución y se marca para que Sheets no lo resucite.
+  markMonthDeleted(ym);
+  delete data[ym];
+  saveLS();
+
+  if(ui.em&&ui.em.value===ym) renderRows(ym);
+  buildChecks();
+  refreshAll();
+  saveUI(true);
+
+  const dot=document.getElementById('syncDot');
+  if(dot) dot.classList.add('syncing');
+
+  let okDel=true, okAll=true;
+  try{ okDel=await delMonth(ym); }catch(_){ okDel=false; }
+  // Refuerzo: después de pedir el borrado, enviamos toda la base local SIN ese mes.
+  // Así evitamos que una sincronización posterior lo vuelva a traer.
+  try{ okAll=await pushAllCloud(); }catch(_){ okAll=false; }
+
+  if(dot) dot.classList.remove('syncing','error');
+  if((okDel===false||okAll===false)&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+  if(opts.alert) alert('Mes borrado. Si lo tenías abierto en otro dispositivo, pulsa sincronizar allí.');
+  return okDel!==false && okAll!==false;
+}
+
 async function resetCurrentMonth(){
   const ym=ui.em.value;
   if(!ym){alert('Selecciona un mes.');return;}
-  clearTimeout(_autoSaveTimer);
-  // Reset real: deja todas las cuentas visibles del mes en 0 y lo guarda al instante en local + Google Sheets.
-  document.querySelectorAll('#rowsActivos .valor,#rowsPasivos .valor,#rowsActivos .aport,#rowsPasivos .aport').forEach(i=>{i.value='0';});
-  const ok=await saveCurrentMonth(true,ym);
-  if(ok){
-    const dot=document.getElementById('syncDot');
-    if(dot){dot.classList.remove('error');}
-  }
+  if(!confirm(`¿Borrar ${ym} por completo? Desaparecerá del historial, gráficos y Google Sheets.`)) return;
+  await deleteMonthEverywhere(ym,{alert:false});
 }
 async function flushCurrentMonthIfDirty(forcedYm=null){
   if(!_monthDirty) return true;
@@ -1238,17 +1270,17 @@ function bindEvents(){
   document.getElementById('btnExportJSON').addEventListener('click',exportJSON);
   document.getElementById('btnImport').addEventListener('click',()=>document.getElementById('fileImport').click());
   document.getElementById('fileImport').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)importJSON(f);e.target.value='';});
-  async function syncCloudNow(btn){if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}await flushCurrentMonthIfDirty();const months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k));if(!months.length){alert('No hay datos.');return;}const oldTxt=btn?btn.textContent:'';if(btn){btn.textContent='⏳';btn.disabled=true;}const ok=await pushAllCloud();await pushUICloud();if(btn){btn.textContent=oldTxt||'☁️';btn.disabled=false;}alert(ok?`${months.length} meses enviados a Google Sheets.`:'No se pudo enviar a Google Sheets. Revisa que Apps Script esté desplegado como aplicación web: Ejecutar como Yo y acceso Cualquier usuario.');}
+  async function syncCloudNow(btn){if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}await flushCurrentMonthIfDirty();const months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k));if(!months.length){alert('No hay datos.');return;}const oldTxt=btn?btn.textContent:'';if(btn){btn.textContent='⏳';btn.disabled=true;}const ok=await pushAllCloud();await pushUICloud();if(btn){btn.textContent=oldTxt||'☁️';btn.disabled=false;}alert(ok?`${months.length} meses enviados a Google Sheets.`:'No se pudo enviar a Google Sheets. Revisa que Apps Script esté desplegado como aplicación web: Ejecutar como Yo y acceso Cualquier usuario.');}
   document.getElementById('btnSyncCloud')?.addEventListener('click',()=>syncCloudNow(document.getElementById('btnSyncCloud')));
   document.getElementById('btnSyncCloudH')?.addEventListener('click',()=>syncCloudNow(document.getElementById('btnSyncCloudH')));
   document.getElementById('btnUnhide')?.addEventListener('click',()=>{if(!confirm('¿Restaurar cuentas ocultas?'))return;hiddenSet.clear();saveHidden();buildChecks();refreshAll();saveUI();});
-  document.querySelector('#tabla tbody').onclick=async ev=>{const btn=ev.target.closest('button.dm[data-del]');if(!btn)return;const ym=btn.getAttribute('data-del');if(!ym||!confirm(`¿Eliminar ${ym}?`))return;delete data[ym];saveLS();await delMonth(ym);buildChecks();refreshAll();};
+  document.querySelector('#tabla tbody').onclick=async ev=>{const btn=ev.target.closest('button.dm[data-del]');if(!btn)return;const ym=btn.getAttribute('data-del');if(!ym||!confirm(`¿Eliminar ${ym}?`))return;await deleteMonthEverywhere(ym,{alert:false});};
 }
 function onRM(){const m=ui.rm.value;ui.yw.style.display=(m==='year')?'inline-flex':'none';ui.cw.style.display=(m==='custom')?'inline-flex':'none';refreshAll();}
 function dupPrev(){const ym=ui.em.value,prev=addM(ym,-1),src=data[prev];if(!src||!src.cuentas){alert('No hay datos del mes anterior.');return;}renderRows(ym);Object.entries(src.cuentas).forEach(([n,it])=>{const tp=typePref[n]||it.tipo||'activo';const b=document.createElement('div');b.innerHTML=rowHTML(n,tp,it.valor??'',it.aport??'');const d=b.firstElementChild;attachRow(d,tp);(tp==='pasivo'?ui.rp:ui.ra).appendChild(d);});}
 async function onGuardar(){const ok=await saveCurrentMonth(false);if(ok)alert('Mes guardado.');}
 
-function getRange(){let months=Object.keys(data).filter(k=>k!==UI_KEY).sort();if(!months.length)return[];const mode=ui.rm.value;if(mode==='year'){const y=Number(ui.yo.value||new Date().getFullYear());months=months.filter(k=>Number(k.split('-')[0])===y);}else if(mode==='custom'){const a=ui.fm.value||months[0];const b=ui.tm.value||months[months.length-1];months=mBetween(a,b).filter(k=>data[k]);}return months.filter(m=>!isEmpty(m));}
+function getRange(){let months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).sort();if(!months.length)return[];const mode=ui.rm.value;if(mode==='year'){const y=Number(ui.yo.value||new Date().getFullYear());months=months.filter(k=>Number(k.split('-')[0])===y);}else if(mode==='custom'){const a=ui.fm.value||months[0];const b=ui.tm.value||months[months.length-1];months=mBetween(a,b).filter(k=>data[k]);}return months.filter(m=>!isEmpty(m));}
 function mTotals(ym){const cs=(data[ym]&&data[ym].cuentas)?data[ym].cuentas:{};let A=0,P=0,ap=0,vv=0,hv=0;for(const[n,it]of Object.entries(cs)){if(!isIncluded(n))continue;const v=Number(it.valor)||0,a=Number(it.aport)||0;if(it.tipo==='pasivo'){P+=v;if(/^hipoteca$/i.test(n))hv+=v;}else{A+=v;if(/^vivienda$/i.test(n))vv+=v;}ap+=a;}let pat=A-P;if(ui.ivh&&!ui.ivh.checked){pat=(A-vv)-(P-hv);}return{A,P,pat,ap,vv,hv};}
 function isEmpty(ym){const ex=data[ym]?.cuentas&&Object.keys(data[ym].cuentas).length>0;const t=mTotals(ym);return!ex||(t.A===0&&t.P===0&&t.pat===0&&t.ap===0);}
 function calcSeries(){
@@ -1448,7 +1480,7 @@ function buildCrossover(s,labels,tick,grid){
 
 function buildAccountList(s){
   const c=document.getElementById('topDash');if(!c)return;
-  const months=Object.keys(data).filter(k=>k!==UI_KEY).sort();const lYm=months[months.length-1];
+  const lYm=s&&s.labels&&s.labels.length?s.labels[s.labels.length-1]:null;
   if(!lYm){c.innerHTML='<div class="small" style="color:var(--muted)">Sin datos</div>';return;}
   const cs=data[lYm]?.cuentas||{};
   const all=Object.entries(cs).filter(([n,it])=>isIncluded(n)).map(([n,it])=>({n,v:Number(it.valor)||0,tipo:it.tipo})).sort((a,b)=>b.v-a.v);
@@ -1468,7 +1500,7 @@ function buildAccountList(s){
 
 function buildRanking(){
   const c=document.getElementById('topCuentas');if(!c)return;
-  const months=Object.keys(data).filter(k=>k!==UI_KEY).sort();const lYm=months[months.length-1];
+  const s=calcSeries();const lYm=s&&s.labels&&s.labels.length?s.labels[s.labels.length-1]:null;
   if(!lYm){c.innerHTML='<div class="small" style="color:var(--muted)">Sin datos</div>';return;}
   const cs=data[lYm]?.cuentas||{};const activos=Object.entries(cs).filter(([n,it])=>it.tipo==='activo'&&isIncluded(n)).map(([n,it])=>({n,v:Number(it.valor)||0})).sort((a,b)=>b.v-a.v);
   const maxV=activos[0]?.v||1;const colors=['#00ff9f','#4da6ff','#a78bfa','#ffb224','#ff5fa0','#38bdf8','#fb7185','#34d399'];
