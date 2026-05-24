@@ -503,6 +503,45 @@ body.sb-collapsed nav .nitem{padding:8px 14px !important;}
   main{height:calc(100vh - 104px) !important;padding-top:14px !important;}
 }
 
+/* Metas ocultables + navegación móvil sin scroll lateral */
+.metas-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;width:100%;margin-top:2px}
+.meta-toggle{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(0,255,159,.22);background:rgba(0,255,159,.07);color:var(--green);border-radius:999px;padding:6px 12px;font-size:.76rem;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.meta-toggle:hover{border-color:rgba(0,255,159,.45);background:rgba(0,255,159,.12)}
+.meta-toggle .chev{font-size:.68rem;transition:transform .18s ease}
+body.metas-collapsed .meta-toggle .chev{transform:rotate(-90deg)}
+#dashMiles{transition:opacity .18s ease, max-height .22s ease, margin .18s ease;max-height:220px;overflow:hidden}
+body.metas-collapsed #dashMiles{opacity:0;max-height:0;margin:0;pointer-events:none}
+#metasCollapsedInfo{display:none;color:var(--muted2);font-size:.78rem;font-weight:700;border:1px solid var(--border);border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.025)}
+body.metas-collapsed #metasCollapsedInfo{display:inline-flex}
+@media(max-width:900px){
+  nav#sidebar{overflow:visible !important;padding:7px 8px 9px !important;}
+  nav#sidebar .nav-scroll{
+    justify-content:center !important;
+    overflow-x:visible !important;
+    overflow-y:visible !important;
+    width:100% !important;
+    flex-wrap:wrap !important;
+    gap:6px !important;
+  }
+  nav#sidebar .nitem{
+    flex:1 1 calc(33.333% - 8px) !important;
+    min-width:0 !important;
+    padding:7px 5px !important;
+    font-size:.72rem !important;
+    gap:4px !important;
+    min-height:32px !important;
+    white-space:nowrap !important;
+  }
+  nav#sidebar .nicon{font-size:.78rem !important;}
+  main{height:calc(100vh - 143px) !important;padding-top:14px !important;}
+  .metas-head{align-items:flex-start}
+  .meta-toggle{font-size:.72rem;padding:6px 10px}
+}
+@media(max-width:370px){
+  nav#sidebar .nitem{font-size:.68rem !important;padding:7px 3px !important;}
+  nav#sidebar .nicon{display:none !important;}
+}
+
 </style>
 </head>
 <body>
@@ -572,6 +611,10 @@ body.sb-collapsed nav .nitem{padding:8px 14px !important;}
 <div class="tpanel on" id="tab-dashboard">
   <div class="phdr">
     <div><div class="ptitle">Seguimiento de <em>patrimonio</em></div><div class="psub">Resumen general · <span id="dashRango">todos los datos</span></div></div>
+    <div class="metas-head">
+      <button id="btnToggleMetas" class="meta-toggle" type="button"><span class="chev">▼</span><span id="txtToggleMetas">Ocultar metas</span></button>
+      <span id="metasCollapsedInfo">Metas ocultas · <span id="metasCountMini">0</span> objetivos</span>
+    </div>
     <div id="dashMiles" class="miles"></div>
   </div>
   <div class="kgrid" id="kpis">
@@ -941,6 +984,7 @@ function capUI(){return{
   editMonth:document.getElementById('editMonth')?.value||'',
   privacy:document.body.classList.contains('privacy'),
   sbCollapsed:document.body.classList.contains('sb-collapsed'),
+  metasCollapsed:document.body.classList.contains('metas-collapsed'),
   selMap:JSON.parse(JSON.stringify(selMap||{})),
   hidden:Array.from(hiddenSet||[]),
   customCats:JSON.parse(JSON.stringify(customCats||[])),
@@ -995,6 +1039,7 @@ function applyUI(s){
   try { if(Array.isArray(s.goals)&&s.goals.length){goals=s.goals;saveGoals();renderGoalsEditor();} } catch(_) {}
   try { if(ui.em&&s.editMonth) ui.em.value=s.editMonth; } catch(_) {}
   try { document.body.classList.toggle('sb-collapsed', !!s.sbCollapsed); } catch(_) {}
+  try { document.body.classList.toggle('metas-collapsed', !!s.metasCollapsed); updateMetasToggleText(); } catch(_) {}
   try { document.body.classList.toggle('privacy', !!s.privacy); document.getElementById('btnEye')?.classList.toggle('on', !!s.privacy); } catch(_) {}
 }
 function extractUIState(obj){
@@ -1326,6 +1371,16 @@ function buildMilestones(s,cur){
     m.innerHTML=label+((g.kind||'amount')==='amount'?goalPct(g,val):'');
     c.appendChild(m);
   });
+  const mini=document.getElementById('metasCountMini');
+  if(mini) mini.textContent=String(sourceGoals.length);
+}
+
+function updateMetasToggleText(){
+  const hidden=document.body.classList.contains('metas-collapsed');
+  const txt=document.getElementById('txtToggleMetas');
+  const chev=document.querySelector('#btnToggleMetas .chev');
+  if(txt) txt.textContent=hidden?'Mostrar metas':'Ocultar metas';
+  if(chev) chev.textContent=hidden?'▶':'▼';
 }
 
 function renderTabla(s){
@@ -1539,6 +1594,17 @@ const wasEditing=!!document.getElementById('tab-edicion')?.classList.contains('o
 if(wasEditing) await flushCurrentMonthIfDirty();
 document.querySelectorAll('.nitem[data-tab]').forEach(i=>i.classList.remove('on'));document.querySelectorAll('.tpanel').forEach(p=>p.classList.remove('on'));item.classList.add('on');const panel=document.getElementById('tab-'+item.dataset.tab);if(panel)panel.classList.add('on');// Save immediately on tab change
 saveUI(true);setTimeout(()=>Object.values(charts).forEach(c=>{try{c.resize()}catch(_){}}),50);});});
+
+
+const btnToggleMetas=document.getElementById('btnToggleMetas');
+if(btnToggleMetas){
+  btnToggleMetas.addEventListener('click',()=>{
+    document.body.classList.toggle('metas-collapsed');
+    updateMetasToggleText();
+    saveUI(true);
+  });
+  updateMetasToggleText();
+}
 
 // Header export buttons
 document.getElementById('btnExportH')?.addEventListener('click', exportExcel);
