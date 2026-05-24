@@ -1,13 +1,13 @@
 {
-  "name": "Finanzas — Arturo",
-  "short_name": "Finanzas",
-  "description": "Portfolio personal de inversiones",
-  "start_url": "./",
+  "name": "Seguimiento de patrimonio",
+  "short_name": "Patrimonio",
+  "description": "Panel personal de seguimiento patrimonial y calculadora de retirada.",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#040911",
   "theme_color": "#040911",
-  "categories": ["finance"],
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "./icon-192.png",
