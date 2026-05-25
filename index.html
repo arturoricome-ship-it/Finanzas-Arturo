@@ -811,7 +811,7 @@ body.metas-collapsed #metasCollapsedInfo{display:inline-flex}
     <div class="controls" style="margin-top:10px;gap:8px">
       <button id="btnAdd">+ Añadir fila</button>
       <button id="btnGuardar" class="bprim">💾 Guardar ahora</button>
-      <span class="hint">Se guarda automático en local y Google Sheets. Reset mes guarda 0 al instante.</span>
+      <span class="hint">Se guarda automático en local y Google Sheets. Reset mes borra el mes completo.</span>
     </div>
   </div></details>
   <details class="acc" open><summary><span class="chev">▶</span> Configuración de metas</summary><div class="acontent">
@@ -975,6 +975,7 @@ function saveGoals(){localStorage.setItem(keyGoals,JSON.stringify(goals));}
 function loadDeletedMonths(){try{return JSON.parse(localStorage.getItem(keyDeleted))||{}}catch(_){return{}}}
 function saveDeletedMonths(){try{localStorage.setItem(keyDeleted,JSON.stringify(deletedMonths||{}));}catch(_){}}
 function markMonthDeleted(ym){if(!ym)return;deletedMonths[ym]=Date.now();saveDeletedMonths();}
+function unmarkMonthDeleted(ym){if(!ym||!deletedMonths||!deletedMonths[ym])return;delete deletedMonths[ym];saveDeletedMonths();}
 function isMonthDeletedLocally(ym){return !!(deletedMonths&&deletedMonths[ym]);}
 function clearOldDeletedMonths(){const now=Date.now(),ttl=1000*60*60*24*45;let changed=false;Object.keys(deletedMonths||{}).forEach(ym=>{if(now-Number(deletedMonths[ym])>ttl){delete deletedMonths[ym];changed=true;}});if(changed)saveDeletedMonths();}
 function cloudReady(){return typeof GS==='string' && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(GS);}
@@ -1045,7 +1046,7 @@ function applyUI(s){
   try { if(Array.isArray(s.hidden)){hiddenSet=new Set(s.hidden);saveHidden();} } catch(_) {}
   try { if(Array.isArray(s.customCats)){customCats=s.customCats;saveCats();updateCatDatalist();renderCatList();} } catch(_) {}
   try { if(Array.isArray(s.goals)&&s.goals.length){goals=s.goals;saveGoals();renderGoalsEditor();} } catch(_) {}
-  try { if(ui.em&&s.editMonth) ui.em.value=s.editMonth; } catch(_) {}
+  try { if(ui.em&&s.editMonth){ ui.em.value=s.editMonth; if(typeof renderRows==='function') renderRows(ui.em.value); } } catch(_) {}
   try { document.body.classList.toggle('sb-collapsed', !!s.sbCollapsed); } catch(_) {}
   try { document.body.classList.toggle('metas-collapsed', !!s.metasCollapsed); updateMetasToggleText(); } catch(_) {}
   try { document.body.classList.toggle('privacy', !!s.privacy); document.getElementById('btnEye')?.classList.toggle('on', !!s.privacy); } catch(_) {}
@@ -1104,6 +1105,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
   bindEvents();
   setupRetirada();
   try { restoreUI(); } catch(_) {}
+  // Tras restaurar el mes seleccionado, repintar edición para que no se quede mostrando filas de otro mes.
+  try { if(ui.em&&ui.em.value) renderRows(ui.em.value); } catch(_) {}
   buildChecks();
   refreshAll();
 });
@@ -1189,6 +1192,8 @@ function saveCurrentMonthLocal(forcedYm=null){
   const pack=collectCurrentMonth(forcedYm);
   if(!pack) return null;
   saveSel();saveType();
+  // Si este mes fue borrado antes, al guardarlo de nuevo deja de estar bloqueado.
+  unmarkMonthDeleted(pack.ym);
   data[pack.ym]={cuentas:pack.cuentas};
   saveLS();
   _monthDirty=false;
@@ -1270,14 +1275,22 @@ function bindEvents(){
   document.getElementById('btnExportJSON').addEventListener('click',exportJSON);
   document.getElementById('btnImport').addEventListener('click',()=>document.getElementById('fileImport').click());
   document.getElementById('fileImport').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)importJSON(f);e.target.value='';});
-  async function syncCloudNow(btn){if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}await flushCurrentMonthIfDirty();const months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k));if(!months.length){alert('No hay datos.');return;}const oldTxt=btn?btn.textContent:'';if(btn){btn.textContent='⏳';btn.disabled=true;}const ok=await pushAllCloud();await pushUICloud();if(btn){btn.textContent=oldTxt||'☁️';btn.disabled=false;}alert(ok?`${months.length} meses enviados a Google Sheets.`:'No se pudo enviar a Google Sheets. Revisa que Apps Script esté desplegado como aplicación web: Ejecutar como Yo y acceso Cualquier usuario.');}
+  function currentEditHasUsefulData(){
+  try{
+    const pack=collectCurrentMonth();
+    if(!pack||!pack.ym)return false;
+    if(data[pack.ym])return true;
+    return Object.values(pack.cuentas||{}).some(it=>(Number(it.valor)||0)!==0||(Number(it.aport)||0)!==0);
+  }catch(_){return false;}
+}
+async function syncCloudNow(btn){if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}if(document.querySelector('.nitem.on')?.dataset.tab==='edicion'&&currentEditHasUsefulData()) await saveCurrentMonth(true); else await flushCurrentMonthIfDirty();const months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k));if(!months.length){alert('No hay datos.');return;}const oldTxt=btn?btn.textContent:'';if(btn){btn.textContent='⏳';btn.disabled=true;}const ok=await pushAllCloud();await pushUICloud();if(btn){btn.textContent=oldTxt||'☁️';btn.disabled=false;}alert(ok?`${months.length} meses enviados a Google Sheets.`:'No se pudo enviar a Google Sheets. Revisa que Apps Script esté desplegado como aplicación web: Ejecutar como Yo y acceso Cualquier usuario.');}
   document.getElementById('btnSyncCloud')?.addEventListener('click',()=>syncCloudNow(document.getElementById('btnSyncCloud')));
   document.getElementById('btnSyncCloudH')?.addEventListener('click',()=>syncCloudNow(document.getElementById('btnSyncCloudH')));
   document.getElementById('btnUnhide')?.addEventListener('click',()=>{if(!confirm('¿Restaurar cuentas ocultas?'))return;hiddenSet.clear();saveHidden();buildChecks();refreshAll();saveUI();});
   document.querySelector('#tabla tbody').onclick=async ev=>{const btn=ev.target.closest('button.dm[data-del]');if(!btn)return;const ym=btn.getAttribute('data-del');if(!ym||!confirm(`¿Eliminar ${ym}?`))return;await deleteMonthEverywhere(ym,{alert:false});};
 }
 function onRM(){const m=ui.rm.value;ui.yw.style.display=(m==='year')?'inline-flex':'none';ui.cw.style.display=(m==='custom')?'inline-flex':'none';refreshAll();}
-function dupPrev(){const ym=ui.em.value,prev=addM(ym,-1),src=data[prev];if(!src||!src.cuentas){alert('No hay datos del mes anterior.');return;}renderRows(ym);Object.entries(src.cuentas).forEach(([n,it])=>{const tp=typePref[n]||it.tipo||'activo';const b=document.createElement('div');b.innerHTML=rowHTML(n,tp,it.valor??'',it.aport??'');const d=b.firstElementChild;attachRow(d,tp);(tp==='pasivo'?ui.rp:ui.ra).appendChild(d);});}
+function dupPrev(){const ym=ui.em.value,prev=addM(ym,-1),src=data[prev];if(!src||!src.cuentas){alert('No hay datos del mes anterior.');return;}ui.ra.innerHTML='';ui.rp.innerHTML='';Object.entries(src.cuentas).filter(([n])=>n!=='config').forEach(([n,it])=>{const tp=typePref[n]||it.tipo||'activo';const b=document.createElement('div');b.innerHTML=rowHTML(n,tp,it.valor??'',it.aport??'');const d=b.firstElementChild;attachRow(d,tp);(tp==='pasivo'?ui.rp:ui.ra).appendChild(d);});scheduleAutoSave();}
 async function onGuardar(){const ok=await saveCurrentMonth(false);if(ok)alert('Mes guardado.');}
 
 function getRange(){let months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).sort();if(!months.length)return[];const mode=ui.rm.value;if(mode==='year'){const y=Number(ui.yo.value||new Date().getFullYear());months=months.filter(k=>Number(k.split('-')[0])===y);}else if(mode==='custom'){const a=ui.fm.value||months[0];const b=ui.tm.value||months[months.length-1];months=mBetween(a,b).filter(k=>data[k]);}return months.filter(m=>!isEmpty(m));}
