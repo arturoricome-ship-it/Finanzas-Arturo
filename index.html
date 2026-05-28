@@ -858,29 +858,55 @@ async function fetchSheets(){
       delete window[cb];try{document.head.removeChild(script);}catch(_){}
       console.warn('fetchSheets timeout');resolve(false);
     },10000);
+
+    const monthKeys=obj=>Object.keys(obj||{}).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k));
+    const updatedOf=v=>Number(v?.updatedAt||v?.modifiedAt||v?.ts||0)||0;
+
     window[cb]=function(j){
       clearTimeout(tmt);delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
       if(!j||typeof j!=='object'){resolve(false);return;}
+
       // Si este navegador ha borrado un mes recientemente, no dejamos que una copia antigua de Sheets lo resucite.
       clearOldDeletedMonths();
       Object.keys(j).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k)&&isMonthDeletedLocally(k)) delete j[k];});
-      const cm=Object.keys(j).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).length;
-      const lm=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).length;
-      if(cm===0&&lm>0){
-        console.log('Sheets vacío, conservando '+lm+' meses locales');
+
+      const cloudMonths=monthKeys(j);
+      const localMonths=monthKeys(data);
+
+      if(cloudMonths.length===0&&localMonths.length>0){
+        console.log('Sheets vacío, conservando '+localMonths.length+' meses locales');
         if(j[UI_KEY])data[UI_KEY]=j[UI_KEY];
-        resolve(false);
-      }else if(cm>=lm){
-        data=j;saveLS();
-        console.log('Sheets cargado: '+cm+' meses');
-        resolve(true);
-      }else{
-        Object.keys(j).forEach(k=>{if(!data[k])data[k]=j[k];});
         saveLS();
-        console.log('Merge: local='+lm+' cloud='+cm);
-        resolve(true);
+        resolve(false);
+        return;
       }
+
+      // Antes se hacía data=j si Sheets tenía tantos o más meses que local.
+      // Eso podía machacar una edición local reciente cuando el POST a Sheets no había entrado.
+      // Ahora se fusiona mes a mes y una copia local con updatedAt gana frente a una copia cloud antigua/sin fecha.
+      const merged={...data};
+      const all=new Set([...localMonths,...cloudMonths]);
+      all.forEach(ym=>{
+        const l=data[ym], c=j[ym];
+        if(!l&&c){ merged[ym]=c; return; }
+        if(l&&!c){ merged[ym]=l; return; }
+        const lu=updatedOf(l), cu=updatedOf(c);
+        if(lu||cu) merged[ym]=(lu>=cu)?l:c;
+        else merged[ym]=c; // datos antiguos sin marca: mantenemos el comportamiento previo, gana Sheets
+      });
+
+      // UI: elegir la más reciente si existe en ambos lados.
+      const localUI=extractUIState(data);
+      const cloudUI=extractUIState(j);
+      if(localUI&&cloudUI) merged[UI_KEY]=(Number(localUI.ts)||0)>=(Number(cloudUI.ts)||0)?localUI:cloudUI;
+      else if(cloudUI) merged[UI_KEY]=cloudUI;
+      else if(localUI) merged[UI_KEY]=localUI;
+
+      data=merged;
+      saveLS();
+      console.log('Sync merge: local='+localMonths.length+' cloud='+cloudMonths.length+' final='+monthKeys(data).length);
+      resolve(cloudMonths.length>0);
     };
     script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve(false);};
     script.src=GS+'?action=getAll&callback='+cb;
@@ -888,6 +914,31 @@ async function fetchSheets(){
   });
 }
 function postToAppsScript(payload){
+  if(!cloudReady()) return Promise.resolve(false);
+
+  // Primero intentamos un POST simple con fetch no-cors. Es más fiable en móvil/PWA
+  // que el formulario oculto con iframe, y Apps Script recibe e.parameter.payload.
+  try{
+    const body=new URLSearchParams();
+    body.set('payload', JSON.stringify(payload));
+    if(navigator.sendBeacon){
+      // sendBeacon es útil justo antes de cerrar la página; no bloquea la navegación.
+      // Lo dejamos como apoyo solo para envíos de UI, no como única vía.
+    }
+    return fetch(GS,{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body:body.toString(),
+      cache:'no-store',
+      keepalive:true
+    }).then(()=>true).catch(()=>postToAppsScriptIframe(payload));
+  }catch(e){
+    return postToAppsScriptIframe(payload);
+  }
+}
+
+function postToAppsScriptIframe(payload){
   if(!cloudReady()) return Promise.resolve(false);
   return new Promise(resolve=>{
     try{
@@ -927,7 +978,7 @@ function postToAppsScript(payload){
         if(done) return;
         done=true;
         cleanup();
-        resolve(true); // el envío puede haberse hecho aunque Google no permita leer respuesta
+        resolve(true); // no podemos leer la respuesta cross-origin, pero el POST ya se lanzó
       },8000);
     }catch(e){
       console.error('postToAppsScript error',e);
@@ -1194,7 +1245,7 @@ function saveCurrentMonthLocal(forcedYm=null){
   saveSel();saveType();
   // Si este mes fue borrado antes, al guardarlo de nuevo deja de estar bloqueado.
   unmarkMonthDeleted(pack.ym);
-  data[pack.ym]={cuentas:pack.cuentas};
+  data[pack.ym]={cuentas:pack.cuentas,updatedAt:Date.now()};
   saveLS();
   _monthDirty=false;
   buildChecks();refreshAll();
@@ -1203,9 +1254,10 @@ function saveCurrentMonthLocal(forcedYm=null){
 async function saveCurrentMonth(silent=false,forcedYm=null){
   const pack=saveCurrentMonthLocal(forcedYm);
   if(!pack){if(!silent)alert('Selecciona un mes.');return false;}
-  await pushMonth(pack.ym);
+  const okMonth=await pushMonth(pack.ym);
   await pushUICloud();
-  return true;
+  if(!okMonth&&!silent)alert('Guardado en este dispositivo, pero NO confirmado en Google Sheets. Revisa la URL /exec y permisos del Apps Script.');
+  return okMonth;
 }
 async function deleteMonthEverywhere(ym, opts={}){
   if(!ym) return false;
@@ -1291,7 +1343,7 @@ async function syncCloudNow(btn){if(!cloudReady()){alert('Falta pegar la URL /ex
 }
 function onRM(){const m=ui.rm.value;ui.yw.style.display=(m==='year')?'inline-flex':'none';ui.cw.style.display=(m==='custom')?'inline-flex':'none';refreshAll();}
 function dupPrev(){const ym=ui.em.value,prev=addM(ym,-1),src=data[prev];if(!src||!src.cuentas){alert('No hay datos del mes anterior.');return;}ui.ra.innerHTML='';ui.rp.innerHTML='';Object.entries(src.cuentas).filter(([n])=>n!=='config').forEach(([n,it])=>{const tp=typePref[n]||it.tipo||'activo';const b=document.createElement('div');b.innerHTML=rowHTML(n,tp,it.valor??'',it.aport??'');const d=b.firstElementChild;attachRow(d,tp);(tp==='pasivo'?ui.rp:ui.ra).appendChild(d);});scheduleAutoSave();}
-async function onGuardar(){const ok=await saveCurrentMonth(false);if(ok)alert('Mes guardado.');}
+async function onGuardar(){const ok=await saveCurrentMonth(false);if(ok)alert('Mes guardado y enviado a Google Sheets.');}
 
 function getRange(){let months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).sort();if(!months.length)return[];const mode=ui.rm.value;if(mode==='year'){const y=Number(ui.yo.value||new Date().getFullYear());months=months.filter(k=>Number(k.split('-')[0])===y);}else if(mode==='custom'){const a=ui.fm.value||months[0];const b=ui.tm.value||months[months.length-1];months=mBetween(a,b).filter(k=>data[k]);}return months.filter(m=>!isEmpty(m));}
 function mTotals(ym){const cs=(data[ym]&&data[ym].cuentas)?data[ym].cuentas:{};let A=0,P=0,ap=0,vv=0,hv=0;for(const[n,it]of Object.entries(cs)){if(!isIncluded(n))continue;const v=Number(it.valor)||0,a=Number(it.aport)||0;if(it.tipo==='pasivo'){P+=v;if(/^hipoteca$/i.test(n))hv+=v;}else{A+=v;if(/^vivienda$/i.test(n))vv+=v;}ap+=a;}let pat=A-P;if(ui.ivh&&!ui.ivh.checked){pat=(A-vv)-(P-hv);}return{A,P,pat,ap,vv,hv};}
