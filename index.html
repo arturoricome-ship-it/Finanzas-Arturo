@@ -913,77 +913,37 @@ async function fetchSheets(){
     document.head.appendChild(script);
   });
 }
+// Envía datos a Apps Script usando JSONP (GET con parámetros).
+// Es el único método 100% fiable cross-origin en móvil, PWA y escritorio
+// sin necesidad de CORS ni configuración especial en el servidor.
+// El payload se pasa como parámetro "p" codificado en la URL.
+// Apps Script lo recibe en doGet via e.parameter.p.
 function postToAppsScript(payload){
   if(!cloudReady()) return Promise.resolve(false);
-
-  // Primero intentamos un POST simple con fetch no-cors. Es más fiable en móvil/PWA
-  // que el formulario oculto con iframe, y Apps Script recibe e.parameter.payload.
-  try{
-    const body=new URLSearchParams();
-    body.set('payload', JSON.stringify(payload));
-    if(navigator.sendBeacon){
-      // sendBeacon es útil justo antes de cerrar la página; no bloquea la navegación.
-      // Lo dejamos como apoyo solo para envíos de UI, no como única vía.
-    }
-    return fetch(GS,{
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-      body:body.toString(),
-      cache:'no-store',
-      keepalive:true
-    }).then(()=>true).catch(()=>postToAppsScriptIframe(payload));
-  }catch(e){
-    return postToAppsScriptIframe(payload);
-  }
-}
-
-function postToAppsScriptIframe(payload){
-  if(!cloudReady()) return Promise.resolve(false);
   return new Promise(resolve=>{
-    try{
-      const iframeName='gs_iframe_'+Date.now()+'_'+Math.random().toString(16).slice(2);
-      const iframe=document.createElement('iframe');
-      iframe.name=iframeName;
-      iframe.style.display='none';
-      document.body.appendChild(iframe);
-
-      const form=document.createElement('form');
-      form.method='POST';
-      form.action=GS;
-      form.target=iframeName;
-      form.enctype='application/x-www-form-urlencoded';
-      form.style.display='none';
-
-      const input=document.createElement('input');
-      input.type='hidden';
-      input.name='payload';
-      input.value=JSON.stringify(payload);
-      form.appendChild(input);
-      document.body.appendChild(form);
-
-      let done=false;
-      const cleanup=()=>{
-        try{form.remove();}catch(_){ }
-        try{iframe.remove();}catch(_){ }
-      };
-      iframe.onload=()=>{
-        if(done) return;
-        done=true;
-        setTimeout(cleanup,200);
-        resolve(true);
-      };
-      form.submit();
-      setTimeout(()=>{
-        if(done) return;
-        done=true;
-        cleanup();
-        resolve(true); // no podemos leer la respuesta cross-origin, pero el POST ya se lanzó
-      },8000);
-    }catch(e){
-      console.error('postToAppsScript error',e);
+    const cb='_gsp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const script=document.createElement('script');
+    const tmt=setTimeout(()=>{
+      delete window[cb];
+      try{document.head.removeChild(script);}catch(_){}
+      console.warn('postToAppsScript timeout',payload.action);
       resolve(false);
-    }
+    },12000);
+    window[cb]=function(j){
+      clearTimeout(tmt);
+      delete window[cb];
+      try{document.head.removeChild(script);}catch(_){}
+      resolve(!!(j&&j.ok));
+    };
+    script.onerror=()=>{
+      clearTimeout(tmt);
+      delete window[cb];
+      resolve(false);
+    };
+    // Pasamos el payload completo como parámetro "p" + callback
+    const encoded=encodeURIComponent(JSON.stringify(payload));
+    script.src=GS+'?p='+encoded+'&callback='+cb+'&_='+Date.now();
+    document.head.appendChild(script);
   });
 }
 async function pushMonth(ym){
