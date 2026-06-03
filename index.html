@@ -996,20 +996,48 @@ function capUI(){return{
   goals:JSON.parse(JSON.stringify(goals||[]))
 };}
 function saveUI(force=false){
-  // Las preferencias de pantalla NO se sincronizan ni se guardan como datos.
-  // Así PC y móvil parten siempre del mismo cálculo: Sheets + todos los filtros incluidos.
-  return false;
+  // Guarda el estado visual también en la nube para que PC/móvil abran igual.
+  const st=capUI();
+  try{localStorage.setItem(keyUI,JSON.stringify(st));}catch(_){}
+  clearTimeout(_uiT);
+  if(force){ pushUICloud(); return true; }
+  _uiT=setTimeout(()=>pushUICloud(),650);
+  return true;
 }
 async function pushUICloud(){
-  // Desactivado a propósito: no escribir filtros/estado visual en Sheets.
-  return false;
+  if(!cloudReady()) return false;
+  return postToAppsScript({action:'saveUi',state:capUI()});
 }
 function applyUI(s){
   if(!s) return;
-  // Solo restauramos metas/categorías si existen.
-  // NO restauramos rango, checks, cuentas ocultas ni rendimiento, porque eso hacía que PC y móvil dieran totales distintos.
-  try { if(Array.isArray(s.customCats)){customCats=s.customCats;saveCats();updateCatDatalist();renderCatList();} } catch(_) {}
-  try { if(Array.isArray(s.goals)&&s.goals.length){goals=s.goals;saveGoals();renderGoalsEditor();} } catch(_) {}
+  try{ if(Array.isArray(s.customCats)){customCats=s.customCats;saveCats();} }catch(_){}
+  try{ if(Array.isArray(s.goals)&&s.goals.length){goals=s.goals;saveGoals();} }catch(_){}
+  try{ if(s.selMap&&typeof s.selMap==='object'){selMap=s.selMap;saveSel();} }catch(_){}
+  try{ if(Array.isArray(s.hidden)){hiddenSet=new Set(s.hidden);saveHidden();} }catch(_){}
+
+  try{ if(ui.rm&&s.rangeMode){ui.rm.value=s.rangeMode;} }catch(_){}
+  try{ if(ui.yo&&s.yearOnly!==undefined){ui.yo.value=s.yearOnly;} }catch(_){}
+  try{ if(ui.fm&&s.fromMonth!==undefined){ui.fm.value=s.fromMonth;} }catch(_){}
+  try{ if(ui.tm&&s.toMonth!==undefined){ui.tm.value=s.toMonth;} }catch(_){}
+  try{ if(ui.rend&&s.rendMode){ui.rend.value=s.rendMode;} }catch(_){}
+  try{ if(ui.ivh&&s.incVivHip!==undefined){ui.ivh.checked=!!s.incVivHip;} }catch(_){}
+  try{ if(ui.em&&s.editMonth){ui.em.value=s.editMonth;} }catch(_){}
+
+  try{document.body.classList.toggle('privacy',!!s.privacy);document.getElementById('btnEye')?.classList.toggle('on',!!s.privacy);}catch(_){}
+  try{document.body.classList.toggle('sb-collapsed',!!s.sbCollapsed);}catch(_){}
+  try{document.body.classList.toggle('metas-collapsed',!!s.metasCollapsed);updateMetasToggleText?.();}catch(_){}
+
+  try{
+    if(s.tab){
+      document.querySelectorAll('.nitem[data-tab]').forEach(i=>i.classList.remove('on'));
+      document.querySelectorAll('.tpanel').forEach(p=>p.classList.remove('on'));
+      document.querySelector(`.nitem[data-tab="${CSS.escape(s.tab)}"]`)?.classList.add('on');
+      document.getElementById('tab-'+s.tab)?.classList.add('on');
+    }
+  }catch(_){}
+
+  try{updateCatDatalist();renderCatList();}catch(_){}
+  try{onRM();}catch(_){}
 }
 function extractUIState(obj){
   if(!obj) return null;
@@ -1022,12 +1050,13 @@ function extractUIState(obj){
   return null;
 }
 function restoreUI(){
-  // Estado visual no restaurado: evita diferencias entre dispositivos.
-  // Valores por defecto al abrir: dashboard, desde inicio, sin aportaciones, vivienda/hipoteca incluida, todas las cuentas incluidas.
-  try {
+  // Primero nube; si no hay nube, usa local como respaldo del mismo dispositivo.
+  try{
     const cloud=extractUIState(data);
-    if(cloud) applyUI(cloud);
-  } catch(_) {}
+    if(cloud){ applyUI(cloud); return; }
+    const local=JSON.parse(localStorage.getItem(keyUI)||'null');
+    if(local) applyUI(local);
+  }catch(_){}
 }
 
 
@@ -1051,10 +1080,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   try { _cloudLoaded=await fetchSheets(); } catch(_) { _cloudLoaded=false; }
   setDot(_cloudLoaded?'ok':'error');
 
-  // Limpieza dura de filtros locales: PC y móvil tienen que calcular igual.
-  selMap={};
-  hiddenSet=new Set();
-  try{localStorage.removeItem(keySel);localStorage.removeItem(keyHidden);localStorage.removeItem(keyUI);}catch(_){}
+  // No borramos filtros locales aquí: el estado visual se restaura desde Sheets.
 
   buildChecks();
   bindEvents();
