@@ -906,8 +906,14 @@ function fetchSheets(){
   });
 }
 // Envía datos a Apps Script usando JSONP (GET con parámetros).
+// Versión más estable: serializa las escrituras para no pisar una llamada con otra.
+let _cloudWriteQueue = Promise.resolve();
 function postToAppsScript(payload){
   if(!cloudReady()) return Promise.resolve(false);
+  _cloudWriteQueue = _cloudWriteQueue.catch(()=>false).then(()=>postToAppsScriptRaw(payload));
+  return _cloudWriteQueue;
+}
+function postToAppsScriptRaw(payload){
   return new Promise(resolve=>{
     const cb='_gsp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     const script=document.createElement('script');
@@ -916,7 +922,7 @@ function postToAppsScript(payload){
       try{document.head.removeChild(script);}catch(_){}
       console.warn('postToAppsScript timeout',payload.action);
       resolve(false);
-    },12000);
+    },25000);
     window[cb]=function(j){
       clearTimeout(tmt);
       delete window[cb];
@@ -997,11 +1003,12 @@ function capUI(){return{
 };}
 function saveUI(force=false){
   // Guarda el estado visual también en la nube para que PC/móvil abran igual.
+  // No lo manda en cada clic: espera un poco y junta varios cambios en una sola escritura.
   const st=capUI();
   try{localStorage.setItem(keyUI,JSON.stringify(st));}catch(_){}
   clearTimeout(_uiT);
-  if(force){ pushUICloud(); return true; }
-  _uiT=setTimeout(()=>pushUICloud(),650);
+  const delay = force ? 500 : 2000;
+  _uiT=setTimeout(()=>pushUICloud(),delay);
   return true;
 }
 async function pushUICloud(){
@@ -1166,7 +1173,7 @@ let _monthDirty=false;
 function scheduleAutoSave(){
   _monthDirty=true;
   clearTimeout(_autoSaveTimer);
-  _autoSaveTimer=setTimeout(()=>saveCurrentMonth(true),450);
+  _autoSaveTimer=setTimeout(()=>saveCurrentMonth(true),1800);
 }
 function saveCurrentMonthLocal(forcedYm=null){
   const pack=collectCurrentMonth(forcedYm);
