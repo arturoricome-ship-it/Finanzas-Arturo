@@ -17,62 +17,12 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
-
-// Guardado global del estado visual entre dispositivos.
-document.addEventListener('change', e=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.matches('input,select')) saveUI();
-}, true);
-window.addEventListener('pagehide', ()=>saveUI(true));
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
-
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js">
-// Guardado global del estado visual entre dispositivos.
-document.addEventListener('change', e=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.matches('input,select')) saveUI();
-}, true);
-window.addEventListener('pagehide', ()=>saveUI(true));
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
-
-</script>
-<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js">
-// Guardado global del estado visual entre dispositivos.
-document.addEventListener('change', e=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.matches('input,select')) saveUI();
-}, true);
-window.addEventListener('pagehide', ()=>saveUI(true));
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
-
-</script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js">
-// Guardado global del estado visual entre dispositivos.
-document.addEventListener('change', e=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.matches('input,select')) saveUI();
-}, true);
-window.addEventListener('pagehide', ()=>saveUI(true));
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
-
-</script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
-// Guardado global del estado visual entre dispositivos.
-document.addEventListener('change', e=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.matches('input,select')) saveUI();
-}, true);
-window.addEventListener('pagehide', ()=>saveUI(true));
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
-
-</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -832,7 +782,8 @@ body.metas-collapsed #metasCollapsedInfo{display:inline-flex}
 function updateLibWarn(){const w=document.getElementById('libWarn');const msgs=[];if(typeof Chart==='undefined')msgs.push('⚠️ Chart.js no cargado.');if(typeof XLSX==='undefined')msgs.push('⚠️ SheetJS no cargado.');w.textContent=msgs.join(' ');w.style.display=msgs.length?'block':'none';}
 const fmtEUR=v=>isNaN(v)?'–':v.toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
 const fmtPct=v=>isNaN(v)?'–':(v*100).toFixed(2).replace('.',',')+' %';
-const keyLS='arturo_inversiones_v3',keySel='arturo_filtros_sel_v1',keyHidden='arturo_cuentas_ocultas_v1',keyTypePref='arturo_tipo_pref_v1',keyUI='arturo_ui_state_v1',keyCats='arturo_categorias_v1',keyGoals='arturo_metas_v1',keyDeleted='arturo_meses_borrados_v1';
+// localStorage solo para preferencias UI (nunca para datos financieros)
+const keySel='arturo_filtros_sel_v1',keyHidden='arturo_cuentas_ocultas_v1',keyTypePref='arturo_tipo_pref_v1',keyUI='arturo_ui_state_v1',keyCats='arturo_categorias_v1',keyGoals='arturo_metas_v1';
 const defaultCuentas=['Indexa Capital','Myinvestor','Degiro','Emergencia','Efectivo','Vivienda','Hipoteca','Préstamo','Fondo de Emergencia'];
 const defaultGoals=[
   {id:'g-first',name:'Primera inversión',kind:'manual',target:0,base:'patrimonio',done:false,system:true},
@@ -848,68 +799,42 @@ const legacyKeys=['arturo_inversiones','arturo_inversiones_v1','arturo_inversion
 const looksLike=obj=>!!(obj&&typeof obj==='object'&&Object.keys(obj).some(k=>/^\d{4}-\d{2}$/.test(k)&&obj[k]&&typeof obj[k].cuentas==='object'));
 // Pega aquí la URL /exec de tu despliegue de Google Apps Script.
 // Mientras esté vacío, la web funcionará en localStorage, pero no sincronizará entre dispositivos.
+function setDot(state){
+  const dot=document.getElementById('syncDot');
+  if(!dot) return;
+  dot.classList.remove('syncing','error');
+  if(state==='loading') dot.classList.add('syncing');
+  if(state==='error') dot.classList.add('error');
+}
 const GS='https://script.google.com/macros/s/AKfycbzx9_QEcXnwdIQtrxjxnNLEE8BLgeVLRIjPi3exW9hz-YJ9ztRTIpM-eKiB4CS_xhAD/exec';
-async function fetchSheets(){
-  if(!cloudReady()) return false;
+// Lee todos los datos desde Sheets. Sheets es la única fuente de verdad.
+// No hay merge con local: lo que devuelve Sheets ES data.
+function fetchSheets(){
+  if(!cloudReady()) return Promise.resolve(false);
   return new Promise(resolve=>{
     const cb='_gs_'+Date.now();
     const script=document.createElement('script');
     const tmt=setTimeout(()=>{
       delete window[cb];try{document.head.removeChild(script);}catch(_){}
       console.warn('fetchSheets timeout');resolve(false);
-    },10000);
-
-    const monthKeys=obj=>Object.keys(obj||{}).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k));
-    const updatedOf=v=>Number(v?.updatedAt||v?.modifiedAt||v?.ts||0)||0;
-
+    },12000);
     window[cb]=function(j){
       clearTimeout(tmt);delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
       if(!j||typeof j!=='object'){resolve(false);return;}
-
-      // Si este navegador ha borrado un mes recientemente, no dejamos que una copia antigua de Sheets lo resucite.
-      clearOldDeletedMonths();
-      Object.keys(j).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k)&&isMonthDeletedLocally(k)) delete j[k];});
-
-      const cloudMonths=monthKeys(j);
-      const localMonths=monthKeys(data);
-
-      if(cloudMonths.length===0&&localMonths.length>0){
-        console.log('Sheets vacío, conservando '+localMonths.length+' meses locales');
-        if(j[UI_KEY])data[UI_KEY]=j[UI_KEY];
-        saveLS();
-        resolve(false);
-        return;
-      }
-
-      // Antes se hacía data=j si Sheets tenía tantos o más meses que local.
-      // Eso podía machacar una edición local reciente cuando el POST a Sheets no había entrado.
-      // Ahora se fusiona mes a mes y una copia local con updatedAt gana frente a una copia cloud antigua/sin fecha.
-      const merged={...data};
-      const all=new Set([...localMonths,...cloudMonths]);
-      all.forEach(ym=>{
-        const l=data[ym], c=j[ym];
-        if(!l&&c){ merged[ym]=c; return; }
-        if(l&&!c){ merged[ym]=l; return; }
-        const lu=updatedOf(l), cu=updatedOf(c);
-        if(lu||cu) merged[ym]=(lu>=cu)?l:c;
-        else merged[ym]=c; // datos antiguos sin marca: mantenemos el comportamiento previo, gana Sheets
-      });
-
-      // UI: elegir la más reciente si existe en ambos lados.
-      const localUI=extractUIState(data);
-      const cloudUI=extractUIState(j);
-      if(localUI&&cloudUI) merged[UI_KEY]=(Number(localUI.ts)||0)>=(Number(cloudUI.ts)||0)?localUI:cloudUI;
-      else if(cloudUI) merged[UI_KEY]=cloudUI;
-      else if(localUI) merged[UI_KEY]=localUI;
-
-      data=merged;
-      saveLS();
-      console.log('Sync merge: local='+localMonths.length+' cloud='+cloudMonths.length+' final='+monthKeys(data).length);
-      resolve(cloudMonths.length>0);
+      // Sheets manda los datos → reemplaza data completamente, sin merge
+      const meses=Object.keys(j).filter(k=>/^\d{4}-\d{2}$/.test(k));
+      if(meses.length===0){resolve(false);return;}
+      // Limpiar meses anteriores y cargar los de Sheets
+      Object.keys(data).filter(k=>/^\d{4}-\d{2}$/.test(k)).forEach(k=>delete data[k]);
+      meses.forEach(k=>{ data[k]=j[k]; });
+      // UI state de Sheets si existe
+      if(j[UI_KEY]) data[UI_KEY]=j[UI_KEY];
+      console.log('Sheets cargado: '+meses.length+' meses');
+      resolve(true);
     };
     script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve(false);};
-    script.src=GS+'?action=getAll&callback='+cb;
+    script.src=GS+'?action=getAll&callback='+cb+'&_='+Date.now();
     document.head.appendChild(script);
   });
 }
@@ -950,40 +875,10 @@ async function pushMonth(ym){
   if(!cloudReady()) return false;
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
-  const updatedAt=data[ym]?.updatedAt||Date.now();
-  const ok=await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{},updatedAt});
-  // Verificación: leer de vuelta ese mes para confirmar que el timestamp llegó bien
-  if(ok){
-    try{
-      const verified=await verifyMonthInCloud(ym,updatedAt);
-      if(!verified){
-        // El POST llegó pero sin el timestamp correcto → reintento único
-        console.warn('pushMonth: timestamp no confirmado en Sheets, reintentando',ym);
-        await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{},updatedAt});
-      }
-    }catch(_){}
-  }
+  const ok=await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}});
   if(dot)dot.classList.remove('syncing','error');
   if(!ok&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
   return ok;
-}
-// Hace un GET de un mes concreto y comprueba si su updatedAt coincide con el esperado.
-function verifyMonthInCloud(ym,expectedTs){
-  if(!cloudReady()) return Promise.resolve(true); // sin cloud, no podemos verificar
-  return new Promise(resolve=>{
-    const cb='_gsv_'+Date.now();
-    const script=document.createElement('script');
-    const tmt=setTimeout(()=>{delete window[cb];try{document.head.removeChild(script);}catch(_){}resolve(false);},6000);
-    window[cb]=function(j){
-      clearTimeout(tmt);delete window[cb];try{document.head.removeChild(script);}catch(_){}
-      if(!j||typeof j!=='object'){resolve(false);return;}
-      const remoteTs=Number(j[ym]?.updatedAt||j[ym]?.modifiedAt||0);
-      resolve(remoteTs>=expectedTs);
-    };
-    script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve(false);};
-    script.src=GS+'?action=getAll&callback='+cb;
-    document.head.appendChild(script);
-  });
 }
 async function delMonth(ym){
   if(!cloudReady()) return false;
@@ -999,10 +894,10 @@ async function pushAllCloud(){
   return ok;
 }
 
-let data=loadLS();migrateLS();
-let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType(),customCats=loadCats(),goals=loadGoals(),deletedMonths=loadDeletedMonths();
-function loadLS(){try{const r=localStorage.getItem(keyLS);return r?JSON.parse(r):{}}catch(e){return{}}}
-function saveLS(){localStorage.setItem(keyLS,JSON.stringify(data));}
+// data vive solo en memoria — Sheets es la fuente de verdad
+let data={};
+let charts={},ui={},selMap=loadSel(),hiddenSet=loadHidden(),typePref=loadType(),customCats=loadCats(),goals=loadGoals();
+// Preferencias de UI en localStorage (no son datos financieros, no importa si difieren entre dispositivos)
 function loadSel(){try{return JSON.parse(localStorage.getItem(keySel))||{}}catch(_){return{}}}
 function saveSel(){localStorage.setItem(keySel,JSON.stringify(selMap));}
 function loadHidden(){try{const a=JSON.parse(localStorage.getItem(keyHidden))||[];return new Set(a)}catch(_){return new Set()}}
@@ -1013,14 +908,7 @@ function loadCats(){try{return JSON.parse(localStorage.getItem(keyCats))||[]}cat
 function saveCats(){localStorage.setItem(keyCats,JSON.stringify(customCats));}
 function loadGoals(){try{const g=JSON.parse(localStorage.getItem(keyGoals));return Array.isArray(g)&&g.length?g:defaultGoals}catch(_){return defaultGoals}}
 function saveGoals(){localStorage.setItem(keyGoals,JSON.stringify(goals));}
-function loadDeletedMonths(){try{return JSON.parse(localStorage.getItem(keyDeleted))||{}}catch(_){return{}}}
-function saveDeletedMonths(){try{localStorage.setItem(keyDeleted,JSON.stringify(deletedMonths||{}));}catch(_){}}
-function markMonthDeleted(ym){if(!ym)return;deletedMonths[ym]=Date.now();saveDeletedMonths();}
-function unmarkMonthDeleted(ym){if(!ym||!deletedMonths||!deletedMonths[ym])return;delete deletedMonths[ym];saveDeletedMonths();}
-function isMonthDeletedLocally(ym){return !!(deletedMonths&&deletedMonths[ym]);}
-function clearOldDeletedMonths(){const now=Date.now(),ttl=1000*60*60*24*45;let changed=false;Object.keys(deletedMonths||{}).forEach(ym=>{if(now-Number(deletedMonths[ym])>ttl){delete deletedMonths[ym];changed=true;}});if(changed)saveDeletedMonths();}
 function cloudReady(){return typeof GS==='string' && /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(GS);}
-function migrateLS(){if(looksLike(data))return;for(const k of legacyKeys){try{const r=localStorage.getItem(k);if(!r)continue;const p=JSON.parse(r);if(looksLike(p)){data=p;saveLS();return;}}catch(_){}}}
 const UI_KEY='__ui_state__';let _uiT=null;
 function capUI(){return{
   ts:Date.now(),
@@ -1125,30 +1013,16 @@ document.addEventListener('DOMContentLoaded',async()=>{
   ui.krp=document.getElementById('kpiRentPct');ui.kre=document.getElementById('kpiRentEur');ui.kro=document.getElementById('kpiRentOnTotal');
   const today=new Date(),tm=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
   ui.em.value=tm;document.getElementById('fromMonth').value='2016-01';document.getElementById('toMonth').value=tm;document.getElementById('yearOnly').value=today.getFullYear();
-  // ── ARRANQUE: primero sincronizar con Sheets, luego renderizar con datos frescos ──
-  let sheetsHadData = false;
-  try { sheetsHadData = await fetchSheets(); } catch(_) {}
-  // Si Sheets estaba vacío pero tenemos datos locales → sincronizar automáticamente
-  if(!sheetsHadData){
-    const localCount=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).length;
-    if(localCount>0){
-      console.log('Auto-sync: empujando '+localCount+' meses a Sheets...');
-      setTimeout(async()=>{
-        for(const ym of Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).sort()){
-          await pushMonth(ym);
-        }
-        await pushUICloud();
-        console.log('Auto-sync completado');
-      }, 2000);
-    }
-  }
-  // Ahora que data ya tiene los valores mezclados con Sheets, construimos la UI
+
+  // ── ARRANQUE: Sheets es la única fuente de verdad. Cargamos y pintamos. ──
+  setDot('loading');
+  try { await fetchSheets(); } catch(_) {}
+  setDot('ok');
+
   buildChecks();
   bindEvents();
   setupRetirada();
-  // Restaurar estado de UI (tab activo, filtros…) con los datos ya actualizados
   try { restoreUI(); } catch(_) {}
-  // renderRows DESPUÉS de restoreUI para que use el mes correcto con datos frescos de Sheets
   try { const mesActivo=ui.em?.value||tm; renderRows(mesActivo); } catch(_) { renderRows(tm); }
   buildChecks();
   refreshAll();
@@ -1235,10 +1109,7 @@ function saveCurrentMonthLocal(forcedYm=null){
   const pack=collectCurrentMonth(forcedYm);
   if(!pack) return null;
   saveSel();saveType();
-  // Si este mes fue borrado antes, al guardarlo de nuevo deja de estar bloqueado.
-  unmarkMonthDeleted(pack.ym);
-  data[pack.ym]={cuentas:pack.cuentas,updatedAt:Date.now()};
-  saveLS();
+  data[pack.ym]={cuentas:pack.cuentas};
   _monthDirty=false;
   buildChecks();refreshAll();
   return pack;
@@ -1255,30 +1126,16 @@ async function deleteMonthEverywhere(ym, opts={}){
   if(!ym) return false;
   clearTimeout(_autoSaveTimer);
   _monthDirty=false;
-
-  // Borrado real: desaparece del historial, de gráficos, de distribución y se marca para que Sheets no lo resucite.
-  markMonthDeleted(ym);
   delete data[ym];
-  saveLS();
-
   if(ui.em&&ui.em.value===ym) renderRows(ym);
   buildChecks();
   refreshAll();
-  saveUI(true);
-
-  const dot=document.getElementById('syncDot');
-  if(dot) dot.classList.add('syncing');
-
-  let okDel=true, okAll=true;
-  try{ okDel=await delMonth(ym); }catch(_){ okDel=false; }
-  // Refuerzo: después de pedir el borrado, enviamos toda la base local SIN ese mes.
-  // Así evitamos que una sincronización posterior lo vuelva a traer.
-  try{ okAll=await pushAllCloud(); }catch(_){ okAll=false; }
-
-  if(dot) dot.classList.remove('syncing','error');
-  if((okDel===false||okAll===false)&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
-  if(opts.alert) alert('Mes borrado. Si lo tenías abierto en otro dispositivo, pulsa sincronizar allí.');
-  return okDel!==false && okAll!==false;
+  setDot('loading');
+  const ok=await delMonth(ym);
+  setDot(ok?'ok':'error');
+  if(!ok) setTimeout(()=>setDot('ok'),3000);
+  if(opts.alert) alert('Mes borrado.');
+  return ok;
 }
 
 async function resetCurrentMonth(){
@@ -1327,7 +1184,7 @@ function bindEvents(){
     return Object.values(pack.cuentas||{}).some(it=>(Number(it.valor)||0)!==0||(Number(it.aport)||0)!==0);
   }catch(_){return false;}
 }
-async function syncCloudNow(btn){if(!cloudReady()){alert('Falta pegar la URL /exec de Apps Script en la constante GS del index.html.');return;}if(document.querySelector('.nitem.on')?.dataset.tab==='edicion'&&currentEditHasUsefulData()) await saveCurrentMonth(true); else await flushCurrentMonthIfDirty();const months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k));if(!months.length){alert('No hay datos.');return;}const oldTxt=btn?btn.textContent:'';if(btn){btn.textContent='⏳';btn.disabled=true;}const ok=await pushAllCloud();await pushUICloud();if(btn){btn.textContent=oldTxt||'☁️';btn.disabled=false;}alert(ok?`${months.length} meses enviados a Google Sheets.`:'No se pudo enviar a Google Sheets. Revisa que Apps Script esté desplegado como aplicación web: Ejecutar como Yo y acceso Cualquier usuario.');}
+async function syncCloudNow(btn){if(!cloudReady()){alert('Falta la URL /exec de Apps Script.');return;}const oldTxt=btn?btn.textContent:'';if(btn){btn.textContent='⏳';btn.disabled=true;}setDot('loading');const ok=await pushAllCloud();await pushUICloud();setDot(ok?'ok':'error');if(!ok)setTimeout(()=>setDot('ok'),3000);if(btn){btn.textContent=oldTxt||'☁️';btn.disabled=false;}alert(ok?'Datos enviados a Google Sheets correctamente.':'No se pudo conectar con Google Sheets. Comprueba que el Apps Script esté desplegado.');}
   document.getElementById('btnSyncCloud')?.addEventListener('click',()=>syncCloudNow(document.getElementById('btnSyncCloud')));
   document.getElementById('btnSyncCloudH')?.addEventListener('click',()=>syncCloudNow(document.getElementById('btnSyncCloudH')));
   document.getElementById('btnUnhide')?.addEventListener('click',()=>{if(!confirm('¿Restaurar cuentas ocultas?'))return;hiddenSet.clear();saveHidden();buildChecks();refreshAll();saveUI();});
@@ -1357,7 +1214,7 @@ function onRM(){const m=ui.rm.value;ui.yw.style.display=(m==='year')?'inline-fle
 function dupPrev(){const ym=ui.em.value,prev=addM(ym,-1),src=data[prev];if(!src||!src.cuentas){alert('No hay datos del mes anterior.');return;}ui.ra.innerHTML='';ui.rp.innerHTML='';Object.entries(src.cuentas).filter(([n])=>n!=='config').forEach(([n,it])=>{const tp=typePref[n]||it.tipo||'activo';const b=document.createElement('div');b.innerHTML=rowHTML(n,tp,it.valor??'',it.aport??'');const d=b.firstElementChild;attachRow(d,tp);(tp==='pasivo'?ui.rp:ui.ra).appendChild(d);});scheduleAutoSave();}
 async function onGuardar(){const ok=await saveCurrentMonth(false);if(ok)alert('Mes guardado y enviado a Google Sheets.');}
 
-function getRange(){let months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)&&!isMonthDeletedLocally(k)).sort();if(!months.length)return[];const mode=ui.rm.value;if(mode==='year'){const y=Number(ui.yo.value||new Date().getFullYear());months=months.filter(k=>Number(k.split('-')[0])===y);}else if(mode==='custom'){const a=ui.fm.value||months[0];const b=ui.tm.value||months[months.length-1];months=mBetween(a,b).filter(k=>data[k]);}return months.filter(m=>!isEmpty(m));}
+function getRange(){let months=Object.keys(data).filter(k=>k!==UI_KEY&&/^\d{4}-\d{2}$/.test(k)).sort();if(!months.length)return[];const mode=ui.rm.value;if(mode==='year'){const y=Number(ui.yo.value||new Date().getFullYear());months=months.filter(k=>Number(k.split('-')[0])===y);}else if(mode==='custom'){const a=ui.fm.value||months[0];const b=ui.tm.value||months[months.length-1];months=mBetween(a,b).filter(k=>data[k]);}return months.filter(m=>!isEmpty(m));}
 function mTotals(ym){const cs=(data[ym]&&data[ym].cuentas)?data[ym].cuentas:{};let A=0,P=0,ap=0,vv=0,hv=0;for(const[n,it]of Object.entries(cs)){if(!isIncluded(n))continue;const v=Number(it.valor)||0,a=Number(it.aport)||0;if(it.tipo==='pasivo'){P+=v;if(/^hipoteca$/i.test(n))hv+=v;}else{A+=v;if(/^vivienda$/i.test(n))vv+=v;}ap+=a;}let pat=A-P;if(ui.ivh&&!ui.ivh.checked){pat=(A-vv)-(P-hv);}return{A,P,pat,ap,vv,hv};}
 function isEmpty(ym){const ex=data[ym]?.cuentas&&Object.keys(data[ym].cuentas).length>0;const t=mTotals(ym);return!ex||(t.A===0&&t.P===0&&t.pat===0&&t.ap===0);}
 function calcSeries(){
@@ -1685,7 +1542,7 @@ function importJSON(file){
     try{
       const p=JSON.parse(e.target.result);
       if(!looksLike(p)){alert('Formato no válido.');return;}
-      data=p;saveLS();buildChecks();refreshAll();
+      data=p;buildChecks();refreshAll();
       if(cloudReady()){
         const ok=await pushAllCloud();
         await pushUICloud();
@@ -1949,15 +1806,6 @@ function setupRetirada(){
 }
 
 function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCharts(s);buildAccountList(s);buildRanking();buildStatKPIs(s);buildHeatmap(s);buildComp(s);buildProj(s);renderRetirada(s);makeSortable();}
-
-// Guardado global del estado visual entre dispositivos.
-document.addEventListener('change', e=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.matches('input,select')) saveUI();
-}, true);
-window.addEventListener('pagehide', ()=>saveUI(true));
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') saveUI(true); });
 
 </script>
 </body>
