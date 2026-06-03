@@ -809,10 +809,75 @@ function setDot(state){
 const GS='https://script.google.com/macros/s/AKfycbzqK-N3pyC2GhetocHff-CM9QTQ8Y0qcWH490-60Mn8b6lHVEIUNSmCisNnEASc1g3h/exec';
 // Lee todos los datos desde Sheets. Sheets es la única fuente de verdad.
 // No hay merge con local: lo que devuelve Sheets ES data.
+function _toNum(v){
+  if(v===null||v===undefined||v==='') return 0;
+  if(typeof v==='number') return isNaN(v)?0:v;
+  const n=Number(String(v).replace(/\./g,'').replace(',', '.'));
+  return isNaN(n)?0:n;
+}
+function _ymFromAny(v){
+  const raw=String(v??'').trim();
+  if(/^\d{4}-\d{2}$/.test(raw)) return raw;
+  if(/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,7);
+  const d=new Date(raw);
+  if(!isNaN(d.getTime())) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  return '';
+}
+function _convertFlatRowsToData(rows){
+  const out={};
+  (rows||[]).forEach(r=>{
+    if(!r) return;
+    const ym=_ymFromAny(r.fecha ?? r.month ?? r.mes ?? r[0]);
+    const nombre=String(r.nombre ?? r.cuenta ?? r.name ?? r[1] ?? '').trim();
+    if(!ym||!nombre) return;
+    const tipo=String(r.tipo ?? r.type ?? r[2] ?? 'activo').trim() || 'activo';
+    const importe=(r.importe ?? r.valor ?? r.value ?? r[3] ?? 0);
+    const aportacion=(r.aportacion ?? r.aport ?? r.aporte ?? r[4] ?? 0);
+    if(ym===UI_KEY && nombre==='config'){
+      out[UI_KEY]={cuentas:{config:{tipo:String(tipo),valor:0,aport:0}}};
+      try{out[UI_KEY].state=JSON.parse(String(tipo));}catch(_){ }
+      return;
+    }
+    if(!/^\d{4}-\d{2}$/.test(ym)) return;
+    if(!out[ym]) out[ym]={cuentas:{}};
+    out[ym].cuentas[nombre]={tipo:tipo==='pasivo'?'pasivo':'activo',valor:_toNum(importe),aport:_toNum(aportacion)};
+  });
+  return out;
+}
+function _normalizeSheetsResponse(j){
+  if(!j) return {};
+  // Acepta cualquiera de estos formatos:
+  // 1) {ok:true,data:{"2026-06":{cuentas:{...}}}}
+  // 2) {"2026-06":{cuentas:{...}}}
+  // 3) {ok:true,rows:[{fecha,nombre,tipo,importe,aportacion}]}
+  // 4) [{fecha,nombre,tipo,importe,aportacion}]
+  if(Array.isArray(j)) return _convertFlatRowsToData(j);
+  let root=j;
+  if(Array.isArray(j.rows)) return _convertFlatRowsToData(j.rows);
+  if(Array.isArray(j.data)) return _convertFlatRowsToData(j.data);
+  if(j.data&&typeof j.data==='object') root=j.data;
+  else if(j.payload&&typeof j.payload==='object') root=j.payload;
+  if(Array.isArray(root)) return _convertFlatRowsToData(root);
+
+  const normalized={};
+  Object.keys(root||{}).forEach(k=>{
+    if(k===UI_KEY){normalized[k]=root[k];return;}
+    if(/^\d{4}-\d{2}$/.test(k)){
+      const v=root[k];
+      if(v&&v.cuentas) normalized[k]=v;
+      else if(v&&typeof v==='object') normalized[k]={cuentas:v};
+      return;
+    }
+    const ym=_ymFromAny(k);
+    if(ym && !normalized[ym]) normalized[ym]=root[k];
+  });
+  return normalized;
+}
+// Lee todos los datos desde Sheets. Sheets es la única fuente de verdad.
 function fetchSheets(){
   if(!cloudReady()) return Promise.resolve(false);
   return new Promise(resolve=>{
-    const cb='_gs_'+Date.now();
+    const cb='_gs_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     const script=document.createElement('script');
     const tmt=setTimeout(()=>{
       delete window[cb];try{document.head.removeChild(script);}catch(_){}
@@ -821,27 +886,15 @@ function fetchSheets(){
     window[cb]=function(j){
       clearTimeout(tmt);delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
-      if(!j||typeof j!=='object'){resolve(false);return;}
-      // Normalizar claves: acepta tanto "2020-01" como "Wed Jan 01 2020 00:00:00 GMT..."
-      const normalized={};
-      Object.keys(j).forEach(k=>{
-        if(k===UI_KEY){normalized[k]=j[k];return;}
-        if(/^\d{4}-\d{2}$/.test(k)){normalized[k]=j[k];return;}
-        // Intentar parsear fechas largas tipo "Wed Jan 01 2020 00:00:00 GMT+0100..."
-        try{
-          const d=new Date(k);
-          if(!isNaN(d.getTime())){
-            const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-            // Solo sobreescribir si no existe ya una clave corta para ese mes
-            if(!normalized[ym]) normalized[ym]=j[k];
-          }
-        }catch(_){}
-      });
-      const meses=Object.keys(normalized).filter(k=>/^\d{4}-\d{2}$/.test(k));
-      if(meses.length===0){resolve(false);return;}
-      // Limpiar meses anteriores y cargar los de Sheets normalizados
+      if(!j||typeof j!=='object'){console.warn('Respuesta Sheets no válida',j);resolve(false);return;}
+      const normalized=_normalizeSheetsResponse(j);
+      const meses=Object.keys(normalized).filter(k=>/^\d{4}-\d{2}$/.test(k)&&normalized[k]?.cuentas);
+      if(meses.length===0){
+        console.warn('Sheets respondió, pero no hay meses reconocibles. Respuesta recibida:',j);
+        resolve(false);return;
+      }
       Object.keys(data).filter(k=>/^\d{4}-\d{2}$/.test(k)).forEach(k=>delete data[k]);
-      meses.forEach(k=>{ data[k]=normalized[k]; });
+      meses.sort().forEach(k=>{ data[k]=normalized[k]; });
       if(normalized[UI_KEY]) data[UI_KEY]=normalized[UI_KEY];
       console.log('Sheets cargado: '+meses.length+' meses');
       resolve(true);
@@ -852,10 +905,6 @@ function fetchSheets(){
   });
 }
 // Envía datos a Apps Script usando JSONP (GET con parámetros).
-// Es el único método 100% fiable cross-origin en móvil, PWA y escritorio
-// sin necesidad de CORS ni configuración especial en el servidor.
-// El payload se pasa como parámetro "p" codificado en la URL.
-// Apps Script lo recibe en doGet via e.parameter.p.
 function postToAppsScript(payload){
   if(!cloudReady()) return Promise.resolve(false);
   return new Promise(resolve=>{
@@ -871,14 +920,13 @@ function postToAppsScript(payload){
       clearTimeout(tmt);
       delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
-      resolve(!!(j&&j.ok));
+      resolve(!!(j&&(j.ok||j.success||j.status==='ok')));
     };
     script.onerror=()=>{
       clearTimeout(tmt);
       delete window[cb];
       resolve(false);
     };
-    // Pasamos el payload completo como parámetro "p" + callback
     const encoded=encodeURIComponent(JSON.stringify(payload));
     script.src=GS+'?p='+encoded+'&callback='+cb+'&_='+Date.now();
     document.head.appendChild(script);
@@ -1034,8 +1082,9 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
   // ── ARRANQUE: Sheets es la única fuente de verdad. Cargamos y pintamos. ──
   setDot('loading');
-  try { await fetchSheets(); } catch(_) {}
-  setDot('ok');
+  let _cloudLoaded=false;
+  try { _cloudLoaded=await fetchSheets(); } catch(_) { _cloudLoaded=false; }
+  setDot(_cloudLoaded?'ok':'error');
 
   buildChecks();
   bindEvents();
