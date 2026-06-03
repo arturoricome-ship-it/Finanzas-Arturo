@@ -901,10 +901,15 @@ async function pushAllCloud(){
   if(!cloudReady()) return false;
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
-  const ok=await postToAppsScript({action:'saveAll',data:data});
+  const meses=Object.keys(data).filter(k=>/^\d{4}-\d{2}$/.test(k)).sort();
+  let allOk=true;
+  for(const ym of meses){
+    const ok=await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}});
+    if(!ok) allOk=false;
+  }
   if(dot)dot.classList.remove('syncing','error');
-  if(!ok&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
-  return ok;
+  if(!allOk&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+  return allOk;
 }
 
 // data vive solo en memoria — Sheets es la fuente de verdad
