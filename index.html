@@ -822,14 +822,27 @@ function fetchSheets(){
       clearTimeout(tmt);delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
       if(!j||typeof j!=='object'){resolve(false);return;}
-      // Sheets manda los datos → reemplaza data completamente, sin merge
-      const meses=Object.keys(j).filter(k=>/^\d{4}-\d{2}$/.test(k));
+      // Normalizar claves: acepta tanto "2020-01" como "Wed Jan 01 2020 00:00:00 GMT..."
+      const normalized={};
+      Object.keys(j).forEach(k=>{
+        if(k===UI_KEY){normalized[k]=j[k];return;}
+        if(/^\d{4}-\d{2}$/.test(k)){normalized[k]=j[k];return;}
+        // Intentar parsear fechas largas tipo "Wed Jan 01 2020 00:00:00 GMT+0100..."
+        try{
+          const d=new Date(k);
+          if(!isNaN(d.getTime())){
+            const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+            // Solo sobreescribir si no existe ya una clave corta para ese mes
+            if(!normalized[ym]) normalized[ym]=j[k];
+          }
+        }catch(_){}
+      });
+      const meses=Object.keys(normalized).filter(k=>/^\d{4}-\d{2}$/.test(k));
       if(meses.length===0){resolve(false);return;}
-      // Limpiar meses anteriores y cargar los de Sheets
+      // Limpiar meses anteriores y cargar los de Sheets normalizados
       Object.keys(data).filter(k=>/^\d{4}-\d{2}$/.test(k)).forEach(k=>delete data[k]);
-      meses.forEach(k=>{ data[k]=j[k]; });
-      // UI state de Sheets si existe
-      if(j[UI_KEY]) data[UI_KEY]=j[UI_KEY];
+      meses.forEach(k=>{ data[k]=normalized[k]; });
+      if(normalized[UI_KEY]) data[UI_KEY]=normalized[UI_KEY];
       console.log('Sheets cargado: '+meses.length+' meses');
       resolve(true);
     };
