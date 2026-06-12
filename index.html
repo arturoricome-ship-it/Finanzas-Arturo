@@ -1287,26 +1287,28 @@ function postToAppsScript(payload){
   return _cloudWriteQueue;
 }
 function postToAppsScriptRaw(payload){
+  // Intenta primero fetch POST (más rápido, sin límite de URL)
+  // Si falla por CORS, cae a JSONP
+  return fetch(GS,{method:'POST',body:JSON.stringify(payload)})
+    .then(r=>r.json())
+    .then(j=>!!(j&&(j.ok||j.success||j.status==='ok')))
+    .catch(()=>_jsonpPost(payload));
+}
+function _jsonpPost(payload){
   return new Promise(resolve=>{
     const cb='_gsp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     const script=document.createElement('script');
     const tmt=setTimeout(()=>{
       delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
-      console.warn('postToAppsScript timeout',payload.action);
       resolve(false);
     },25000);
     window[cb]=function(j){
-      clearTimeout(tmt);
-      delete window[cb];
+      clearTimeout(tmt);delete window[cb];
       try{document.head.removeChild(script);}catch(_){}
       resolve(!!(j&&(j.ok||j.success||j.status==='ok')));
     };
-    script.onerror=()=>{
-      clearTimeout(tmt);
-      delete window[cb];
-      resolve(false);
-    };
+    script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve(false);};
     const encoded=encodeURIComponent(JSON.stringify(payload));
     script.src=GS+'?p='+encoded+'&callback='+cb+'&_='+Date.now();
     document.head.appendChild(script);
@@ -1329,15 +1331,30 @@ async function pushAllCloud(){
   if(!cloudReady()) return false;
   const dot=document.getElementById('syncDot');
   if(dot)dot.classList.add('syncing');
+
+  // Construir payload con todos los meses de golpe
   const meses=Object.keys(data).filter(k=>/^\d{4}-\d{2}$/.test(k)).sort();
-  let allOk=true;
-  for(const ym of meses){
-    const ok=await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}});
-    if(!ok) allOk=false;
+  const allMonths={};
+  meses.forEach(ym=>{ allMonths[ym]=data[ym]?.cuentas||{}; });
+
+  let ok=false;
+  try{
+    // Un solo POST con todos los datos
+    const r=await fetch(GS,{method:'POST',body:JSON.stringify({action:'upsertAll',months:allMonths})});
+    const j=await r.json();
+    ok=!!(j&&(j.ok||j.success));
+  }catch(_){
+    // Fallback: enviar mes a mes si upsertAll no está disponible aún
+    ok=true;
+    for(const ym of meses){
+      const r=await postToAppsScript({action:'upsert',month:ym,cuentas:data[ym]?.cuentas||{}});
+      if(!r) ok=false;
+    }
   }
+
   if(dot)dot.classList.remove('syncing','error');
-  if(!allOk&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
-  return allOk;
+  if(!ok&&dot){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}
+  return ok;
 }
 
 // data vive solo en memoria — Sheets es la fuente de verdad
