@@ -2399,7 +2399,6 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
 
     <div class="bk-pills">
       ${activos>0?`<div class="bk-pill"><div class="bk-pill-icon">📦</div><div class="bk-pill-val">${fEP(activos)}</div><div class="bk-pill-label">Activos</div></div>`:''}
-      ${pasivos>0?`<div class="bk-pill"><div class="bk-pill-icon">📋</div><div class="bk-pill-val">${fEP(pasivos)}</div><div class="bk-pill-label">Deuda</div></div>`:''}
       ${cartera>0?`<div class="bk-pill"><div class="bk-pill-icon">📈</div><div class="bk-pill-val">${fEP(cartera)}</div><div class="bk-pill-label">Inversión</div></div>`:''}
       ${hip>0?`<div class="bk-pill"><div class="bk-pill-icon">🏠</div><div class="bk-pill-val">${fEP(hip)}</div><div class="bk-pill-label">Hipoteca</div></div>`:''}
       ${aportTotal>0?`<div class="bk-pill"><div class="bk-pill-icon">💰</div><div class="bk-pill-val">${fEP(aportTotal)}</div><div class="bk-pill-label">Aportado</div></div>`:''}
