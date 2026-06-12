@@ -717,22 +717,34 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
   display:flex;flex-direction:column;
 }
 .bk-topbar{
-  display:flex;align-items:center;
-  padding:20px 24px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;
+  height:64px;
   border-bottom:1px solid var(--bk-border);
   position:sticky;top:0;z-index:10;
   background:var(--bk-bg);
+  flex-shrink:0;
 }
-.bk-logo{display:flex;align-items:center;gap:10px;}
+.bk-logo{display:flex;align-items:center;gap:11px;}
 .bk-logo-mark{
-  width:32px;height:32px;border-radius:8px;
-  background:linear-gradient(135deg,#1B4F99,#2A7DE1);
+  width:38px;height:38px;border-radius:8px;
+  background:#0d1f3c;
   display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:14px;color:#fff;
-  box-shadow:0 2px 8px rgba(27,79,153,.45);
+  flex-shrink:0;
 }
-.bk-logo-name{font-size:.82rem;font-weight:700;color:var(--bk-text2);letter-spacing:.01em}
-.bk-logo-sub{font-size:.62rem;color:var(--bk-muted);margin-top:1px;letter-spacing:.02em}
+.bk-logo-name{font-size:.86rem;font-weight:700;color:var(--bk-text2);letter-spacing:-.01em;line-height:1.2}
+.bk-logo-sub{font-size:.62rem;color:var(--bk-muted);margin-top:2px;letter-spacing:.01em}
+.bk-topbar-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.bk-topbar-ref{font-family:'IBM Plex Mono','JetBrains Mono',monospace;font-size:.65rem;font-weight:500;color:var(--bk-muted);letter-spacing:.06em}
+.bk-topbar-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.57rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 8px;border-radius:4px;
+  background:rgba(27,79,153,.12);color:#1B4F99;
+  border:1px solid rgba(27,79,153,.18);
+}
+#bankOverlay.bk-light .bk-topbar-badge{background:rgba(27,79,153,.1);color:#1B4F99;border-color:rgba(27,79,153,.2)}
+#bankOverlay:not(.bk-light) .bk-topbar-badge{background:rgba(42,126,225,.15);color:#7EB8FF;border-color:rgba(42,126,225,.25)}
 .bk-hero{
   padding:36px 24px 30px;
   text-align:center;
@@ -845,7 +857,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
     <div class="hdiv"></div>
     <div class="hkpi"><span class="hkpi-label">Rentabilidad</span><div class="hkpi-val" id="headerRent">—</div></div>
     <div class="hdiv"></div>
-    <div class="hkpi"><span class="hkpi-label">Cartera inv.</span><div class="hkpi-val" id="headerCartera">—</div></div>
+    <div class="hkpi"><span class="hkpi-label">Cartera inv.</span><div class="hkpi-val private-val" id="headerCartera">—</div></div>
   </div>
   <div class="hright">
     <button class="ibutton hbtn-menu" id="btnMenu" title="Menú" style="font-size:1.1rem">☰</button>
@@ -2300,8 +2312,13 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
       .map(([nm,it])=>({name:nm,val:Number(it.valor)||0,tipo:it.tipo}))
       .sort((a,b)=>b.val-a.val);
 
+    const isPrivacy=document.body.classList.contains('privacy');
+    const fEP=v=>isPrivacy?`<span style="filter:blur(12px);user-select:none;opacity:.15">${fE(v)}</span>`:fE(v);
+    // beneficio/delta: SIEMPRE visible aunque privacy esté activo
+
     const patAbs=Math.abs(pat);
-    const euros=Math.floor(patAbs).toLocaleString('es-ES');
+    const eurosRaw=Math.floor(patAbs).toLocaleString('es-ES');
+    const euros=isPrivacy?`<span style="filter:blur(18px);user-select:none;opacity:.12">${eurosRaw}</span>`:eurosRaw;
     const neg=pat<0;
     const deltaClass=(!isNaN(delta)&&delta>=0)?'pos':'neg';
     const deltaSymbol=(!isNaN(delta)&&delta>=0)?'▲':'▼';
@@ -2312,33 +2329,66 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
     let accountsHTML='';
     accounts.forEach((acc,i)=>{
       const iconBg=ACC_COLORS[i%ACC_COLORS.length];
+      // Etiqueta inteligente para pasivos: detecta el nombre real
+      let tagLabel='AHORRO';
+      if(acc.tipo==='pasivo'){
+        const n=acc.name.toLowerCase();
+        if(n.includes('hipotec')||n.includes('mortgage')||n.includes('vivienda')||n.includes('casa')||n.includes('piso')) tagLabel='HIPOTECA';
+        else if(n.includes('préstamo')||n.includes('prestamo')||n.includes('crédito')||n.includes('credito')) tagLabel='PRÉSTAMO';
+        else if(n.includes('tarjet')) tagLabel='TARJETA';
+        else if(n.includes('leasing')) tagLabel='LEASING';
+        else tagLabel='PASIVO';
+      } else {
+        const n=acc.name.toLowerCase();
+        if(n.includes('indexa')||n.includes('myinvestor')||n.includes('degiro')||n.includes('fondo')||n.includes('etf')||n.includes('bolsa')) tagLabel='INVERSIÓN';
+        else if(n.includes('emergencia')||n.includes('reserva')) tagLabel='RESERVA';
+        else if(n.includes('pension')||n.includes('pensión')||n.includes('jubilac')) tagLabel='PENSIÓN';
+        else tagLabel='AHORRO';
+      }
       accountsHTML+=`
       <div class="bk-account">
         <div class="bk-acc-icon" style="background:${iconBg}">${iconFor(acc.name)}</div>
         <div style="flex:1;min-width:0">
           <div class="bk-acc-name">${acc.name}</div>
-          <div class="bk-acc-sub">${acc.tipo==='pasivo'?'Pasivo':'Activo'}</div>
+          <div class="bk-acc-sub">${acc.tipo==='pasivo'?'Financiación':'Patrimonio'}</div>
         </div>
         <div>
-          <div class="bk-acc-val${acc.tipo==='pasivo'?' neg':''}">${fE(acc.val)}</div>
-          <div class="bk-acc-tag ${acc.tipo}">${acc.tipo==='pasivo'?'DEUDA':'AHORRO'}</div>
+          <div class="bk-acc-val${acc.tipo==='pasivo'?' neg':''}">${acc.tipo==='pasivo'?'−':''}${fEP(acc.val)}</div>
+          <div class="bk-acc-tag ${acc.tipo}">${tagLabel}</div>
         </div>
       </div>`;
     });
 
+    // Número de referencia ficticio pero verosímil
+    const refNum='ES·'+String(Math.abs(pat|0)%9000+1000)+'·'+String(n).padStart(4,'0');
+    const nowStr=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,' ');
+
     inner.innerHTML=`
     <div class="bk-topbar">
       <div class="bk-logo">
-        <div class="bk-logo-mark">A</div>
-        <div>
-          <div class="bk-logo-name">Patrimonio personal</div>
-          <div class="bk-logo-sub">Arturo · Banca privada</div>
+        <div class="bk-logo-mark">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="17" width="18" height="2" fill="#7EB8FF" rx="0.5"/>
+            <rect x="4" y="7" width="2.2" height="10" fill="rgba(126,184,255,.7)" rx="0.5"/>
+            <rect x="7.9" y="7" width="2.2" height="10" fill="rgba(126,184,255,.7)" rx="0.5"/>
+            <rect x="11.8" y="7" width="2.2" height="10" fill="rgba(126,184,255,.7)" rx="0.5"/>
+            <rect x="15.7" y="7" width="2.2" height="10" fill="rgba(126,184,255,.7)" rx="0.5"/>
+            <polygon points="2,7 11,2 20,7" fill="none" stroke="#7EB8FF" stroke-width="1.1" stroke-linejoin="round"/>
+          </svg>
         </div>
+        <div>
+          <div class="bk-logo-name">Arturo</div>
+          <div class="bk-logo-sub">Patrimonio personal</div>
+        </div>
+      </div>
+      <div class="bk-topbar-right">
+        <div class="bk-topbar-ref">${refNum}</div>
+        <div class="bk-topbar-badge">Banca privada</div>
       </div>
     </div>
 
     <div class="bk-hero">
-      <div class="bk-hero-label">Balance total${s.labels[0]!==ym?` · ${s.labels[0]} – ${ym}`:''}</div>
+      <div class="bk-hero-label">Balance total a ${nowStr}</div>
       <div class="bk-hero-balance">${neg?'−':''}${euros}<span class="bk-cents">€</span></div>
       ${!isNaN(delta)?`
       <div>
@@ -2348,11 +2398,11 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
     </div>
 
     <div class="bk-pills">
-      ${activos>0?`<div class="bk-pill"><div class="bk-pill-icon">📦</div><div class="bk-pill-val">${fE(activos)}</div><div class="bk-pill-label">Activos</div></div>`:''}
-      ${pasivos>0?`<div class="bk-pill"><div class="bk-pill-icon">📋</div><div class="bk-pill-val">${fE(pasivos)}</div><div class="bk-pill-label">Deuda</div></div>`:''}
-      ${cartera>0?`<div class="bk-pill"><div class="bk-pill-icon">📈</div><div class="bk-pill-val">${fE(cartera)}</div><div class="bk-pill-label">Inversión</div></div>`:''}
-      ${hip>0?`<div class="bk-pill"><div class="bk-pill-icon">🏠</div><div class="bk-pill-val">${fE(hip)}</div><div class="bk-pill-label">Hipoteca</div></div>`:''}
-      ${aportTotal>0?`<div class="bk-pill"><div class="bk-pill-icon">💰</div><div class="bk-pill-val">${fE(aportTotal)}</div><div class="bk-pill-label">Aportado</div></div>`:''}
+      ${activos>0?`<div class="bk-pill"><div class="bk-pill-icon">📦</div><div class="bk-pill-val">${fEP(activos)}</div><div class="bk-pill-label">Activos</div></div>`:''}
+      ${pasivos>0?`<div class="bk-pill"><div class="bk-pill-icon">📋</div><div class="bk-pill-val">${fEP(pasivos)}</div><div class="bk-pill-label">Deuda</div></div>`:''}
+      ${cartera>0?`<div class="bk-pill"><div class="bk-pill-icon">📈</div><div class="bk-pill-val">${fEP(cartera)}</div><div class="bk-pill-label">Inversión</div></div>`:''}
+      ${hip>0?`<div class="bk-pill"><div class="bk-pill-icon">🏠</div><div class="bk-pill-val">${fEP(hip)}</div><div class="bk-pill-label">Hipoteca</div></div>`:''}
+      ${aportTotal>0?`<div class="bk-pill"><div class="bk-pill-icon">💰</div><div class="bk-pill-val">${fEP(aportTotal)}</div><div class="bk-pill-label">Aportado</div></div>`:''}
     </div>
 
     ${activos>0?`
@@ -2381,7 +2431,7 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
         </div>
         <div class="bk-stat">
           <div class="bk-stat-label">Total aportado</div>
-          <div class="bk-stat-val">${fE(aportTotal)}</div>
+          <div class="bk-stat-val">${fEP(aportTotal)}</div>
         </div>
         <div class="bk-stat">
           <div class="bk-stat-label">Meses registrados</div>
