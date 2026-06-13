@@ -864,11 +864,13 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
 .dcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
 .dcal-dow{text-align:center;font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:6px}
 .dcal-cell{
-  border-radius:8px;padding:8px 6px 7px;min-height:64px;
+  border-radius:8px;padding:6px 4px 5px;height:52px;
   border:1px solid var(--border);background:var(--surf);
   cursor:pointer;transition:all .12s;position:relative;
-  display:flex;flex-direction:column;gap:3px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  overflow:hidden;
 }
+.dcal-grid.detalle .dcal-cell{height:68px}
 .dcal-cell:hover{border-color:var(--acc);background:var(--acc-light)}
 .dcal-cell.empty{background:transparent;border-color:transparent;cursor:default;pointer-events:none}
 .dcal-cell.today{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
@@ -1215,9 +1217,12 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
       <div class="sbox"><div class="sval private-val" style="font-size:1rem" id="dkFin">—</div><div class="slabel">Último día</div></div>
       <div class="sbox"><div class="sval" style="font-size:1rem" id="dkDelta">—</div><div class="slabel">Variación mes</div></div>
       <div class="sbox"><div class="sval" style="font-size:1rem" id="dkMaxDrop">—</div><div class="slabel">Peor día</div></div>
+      <div class="sbox"><div class="sval" style="font-size:1rem" id="dkBestDay">—</div><div class="slabel">Mejor día</div></div>
     </div>
     <div style="margin-bottom:16px"><div class="cw h200"><canvas id="chDiario"></canvas></div></div>
-    <div class="shdr" style="margin-bottom:8px"><div class="stitle">Calendario — haz clic en un día para editar</div></div>
+    <div class="shdr" style="margin-bottom:8px">
+      <div class="stitle">Calendario — haz clic en un día para editar</div>
+    </div>
     <div id="diarioCal"></div>
   </div></details>
 </div>
@@ -2368,6 +2373,7 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
   function firstDow(ym){const[y,m]=ym.split('-').map(Number);return(new Date(y,m-1,1).getDay()+6)%7;} // 0=Mon
 
   let currentYM=todayYM();
+  let calDetalle=false;
 
   function getMonthData(ym){
     const days=daysInMonth(ym);
@@ -2386,11 +2392,12 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
     const fin=vals[vals.length-1]??null;
     const delta=(inicio!=null&&fin!=null)?fin-inicio:null;
 
-    // Peor día (mayor caída)
-    let maxDrop=null;
+    // Peor día (mayor caída) y mejor día (mayor subida)
+    let maxDrop=null,bestDay=null;
     for(let i=1;i<days.length;i++){
       const diff=days[i].val-days[i-1].val;
       if(maxDrop===null||diff<maxDrop) maxDrop=diff;
+      if(bestDay===null||diff>bestDay) bestDay=diff;
     }
 
     document.getElementById('dkInicio').textContent=fE(inicio);
@@ -2401,6 +2408,8 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
     const dkM=document.getElementById('dkMaxDrop');
     dkM.textContent=maxDrop!=null?fD(maxDrop):'—';
     dkM.className='sval '+(maxDrop==null?'':(maxDrop>=0?'pos':'neg'));
+    const dkB=document.getElementById('dkBestDay');
+    if(dkB){dkB.textContent=bestDay!=null?fD(bestDay):'—';dkB.className='sval '+(bestDay==null?'':(bestDay>=0?'pos':'neg'));}
 
     // label
     const mn=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -2436,54 +2445,69 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
     if(!cal) return;
     const today=todayStr();
     const days=getMonthData(ym);
-    const fd=firstDow(ym);
-    const dows=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-
-    // Previous day values for diff
     const allKeys=Object.keys(diario).sort();
+    const dows=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const[y,m]=ym.split('-').map(Number);
+    const cols='72px 1fr 1fr 72px';
 
-    let html='<div class="dcal-grid">';
-    dows.forEach(d=>{ html+=`<div class="dcal-dow">${d}</div>`; });
+    let html='<div style="display:flex;flex-direction:column;gap:2px">';
 
-    // empty cells before first day
-    for(let i=0;i<fd;i++) html+='<div class="dcal-cell empty"></div>';
+    // Header
+    html+=`<div style="display:grid;grid-template-columns:${cols};gap:6px;padding:5px 12px;font-size:.57rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:4px">
+      <div>Día</div>
+      <div style="text-align:right">Patrimonio</div>
+      <div style="text-align:right">Cambio</div>
+      <div style="text-align:right">%</div>
+    </div>`;
 
     days.forEach(({day,key,val})=>{
       const isToday=key===today;
       const isFuture=key>today;
       const hasData=val!==null;
+      const dow=dows[new Date(y,m-1,day).getDay()];
+      const isWeekend=dow==='Sáb'||dow==='Dom';
 
-      // diff vs previous day with data
-      let diff=null;
+      let diff=null,pct=null;
       if(hasData){
         const prevKey=allKeys.filter(k=>k<key&&diario[k]!=null).pop();
-        if(prevKey!=null) diff=val-diario[prevKey];
+        if(prevKey!=null){diff=val-diario[prevKey];pct=diario[prevKey]>0?diff/diario[prevKey]*100:null;}
       }
 
-      let cls='dcal-cell';
-      if(isToday) cls+=' today';
-      if(isFuture) cls+=' future';
-      if(hasData) cls+=' has-data';
+      const fm='font-family:var(--fm);font-size:.82rem;font-weight:600';
+      const clr=diff==null?'color:var(--muted)':diff>0?'color:var(--good)':diff<0?'color:var(--bad)':'color:var(--muted)';
 
-      const valStr=hasData?`<div class="dcal-val private-val">${fE(val)}</div>`:'';
-      let diffStr='';
-      if(diff!==null){
-        const dc=diff>0?'pos':diff<0?'neg':'zero';
-        const ds=diff>=0?'↑':'↓';
-        diffStr=`<div class="dcal-diff ${dc}">${ds}${Math.abs(diff).toLocaleString('es-ES',{maximumFractionDigits:0})}</div>`;
-      }
+      const patStr=hasData
+        ?`<span class="private-val" style="${fm};color:var(--text)">${fE(val)}</span>`
+        :'<span style="color:var(--muted)">—</span>';
 
-      html+=`<div class="${cls}" data-key="${key}" data-day="${day}">`+
-        `<div class="dcal-num">${day}</div>`+
-        valStr+diffStr+
-        `</div>`;
+      const difStr=diff==null
+        ?(hasData?'<span style="color:var(--muted);font-size:.75rem">●</span>':'<span style="color:var(--muted)">—</span>')
+        :`<span style="${fm};${clr}">${diff>=0?'↑':'↓'}${Math.abs(diff).toLocaleString('es-ES',{maximumFractionDigits:0})}</span>`;
+
+      const pctStr=pct==null
+        ?'<span style="color:var(--muted)">—</span>'
+        :`<span style="${fm};${clr}">${pct>=0?'+':''}${pct.toFixed(2).replace('.',',')}%</span>`;
+
+      let bg='transparent',border='1px solid transparent';
+      if(isToday){bg='var(--acc-light)';border='1px solid var(--acc)';}
+      else if(hasData){bg='var(--bg)';border='1px solid var(--border)';}
+
+      html+=`<div data-key="${key}" data-day="${day}" style="display:grid;grid-template-columns:${cols};gap:6px;padding:9px 12px;border-radius:8px;align-items:center;cursor:pointer;background:${bg};border:${border};opacity:${isFuture?.35:1};transition:background .1s;${isFuture?'pointer-events:none;':''}">
+        <div style="font-size:.84rem;font-weight:${isToday?700:500};color:${isToday?'var(--acc)':isWeekend?'var(--muted2)':'var(--text2)'}">${dow} ${day}</div>
+        <div style="text-align:right">${patStr}</div>
+        <div style="text-align:right">${difStr}</div>
+        <div style="text-align:right">${pctStr}</div>
+      </div>`;
     });
+
     html+='</div>';
     cal.innerHTML=html;
 
-    // click to edit
-    cal.querySelectorAll('.dcal-cell:not(.empty):not(.future)').forEach(cell=>{
-      cell.addEventListener('click',()=>openModal(cell.dataset.key,cell.dataset.day,ym));
+    cal.querySelectorAll('[data-key]').forEach(row=>{
+      if(row.style.pointerEvents==='none') return;
+      row.addEventListener('click',()=>openModal(row.dataset.key,row.dataset.day,ym));
+      row.addEventListener('mouseenter',()=>{if(row.style.background==='transparent') row.style.background='var(--panel)';});
+      row.addEventListener('mouseleave',()=>{if(row.style.background==='var(--panel)') row.style.background='transparent';});
     });
   }
 
@@ -2494,13 +2518,17 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
     const mn=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const[y,m]=ym.split('-').map(Number);
     const cur=diario[key]??'';
+    // calc diff for display in modal
+    const prevKey2=Object.keys(diario).filter(k=>k<key&&diario[k]!=null).sort().pop();
+    const curDiff=cur!==''&&prevKey2!=null?cur-diario[prevKey2]:null;
+    const diffLabel=curDiff!=null?(curDiff>=0?`<span style="color:var(--good)">↑ ${Math.abs(curDiff).toLocaleString('es-ES',{maximumFractionDigits:0})} €</span>`:`<span style="color:var(--bad)">↓ ${Math.abs(curDiff).toLocaleString('es-ES',{maximumFractionDigits:0})} €</span>`):'';
 
     modalBg=document.createElement('div');
     modalBg.className='dcal-modal-bg';
     modalBg.innerHTML=`
       <div class="dcal-modal">
         <h3>Día ${day} — ${mn[m-1]} ${y}</h3>
-        <p class="hint">Introduce el patrimonio total de este día</p>
+        <p class="hint">${cur!==''?`Actual: <strong>${Number(cur).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</strong>${diffLabel?' · '+diffLabel:''}`:'Sin dato registrado'}</p>
         <div class="dcal-modal-row">
           <label>Patrimonio total (€)</label>
           <input type="number" id="dcalInput" value="${cur}" placeholder="Ej: 310000" step="1">
