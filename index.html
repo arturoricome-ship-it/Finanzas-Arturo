@@ -241,7 +241,7 @@ header{grid-area:hdr;display:flex;align-items:center;justify-content:space-betwe
 .ibutton:hover,.ibutton.on{color:var(--green);border-color:rgba(0,255,159,.3);background:rgba(0,255,159,.07)}
 .ibutton.on .eo{display:none}
 .ibutton:not(.on) .ec{display:none}
-body.privacy .private-val,body.privacy .col-private{filter:blur(6px);opacity:.3;pointer-events:none;user-select:none;transition:all .3s}
+body.privacy .private-val,body.privacy .col-private{filter:blur(6px);opacity:.45;pointer-events:none;user-select:none;transition:all .3s}
 body:not(.privacy) .private-val,body:not(.privacy) .col-private{filter:none;opacity:1;transition:all .3s}
 
 /* SIDEBAR */
@@ -701,7 +701,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
   --bk-muted:     #7A8FA8;
   --bk-muted2:    #a0b0c0;
   --bk-surf:      #FFFFFF;
-  --bk-surf2:     #EEF1F6;
+  --bk-surf2:     #F2F5FA;
   --bk-pos:       #0E7C5A;
   --bk-pos-bg:    rgba(14,124,90,.1);
   --bk-neg:       #C0392B;
@@ -746,9 +746,10 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
 #bankOverlay.bk-light .bk-topbar-badge{background:rgba(27,79,153,.1);color:#1B4F99;border-color:rgba(27,79,153,.2)}
 #bankOverlay:not(.bk-light) .bk-topbar-badge{background:rgba(42,126,225,.15);color:#7EB8FF;border-color:rgba(42,126,225,.25)}
 .bk-hero{
-  padding:36px 24px 30px;
+  padding:40px 24px 32px;
   text-align:center;
   border-bottom:1px solid var(--bk-border);
+  background:var(--bk-bg);
 }
 .bk-hero-label{
   font-size:.6rem;font-weight:700;letter-spacing:.16em;
@@ -777,11 +778,13 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
 .bk-pills::-webkit-scrollbar{display:none}
 .bk-pill{
   flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
-  gap:5px;padding:12px 18px;border-radius:12px;
-  background:var(--bk-surf);border:1px solid var(--bk-surf2);
-  cursor:default;min-width:90px;
+  gap:6px;padding:14px 18px;border-radius:12px;
+  background:var(--bk-surf);border:1px solid var(--bk-border);
+  cursor:default;min-width:96px;
+  box-shadow:0 1px 4px rgba(13,27,46,.05);
 }
-.bk-pill-icon{font-size:18px;line-height:1}
+.bk-pill-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bk-pill-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--bk-muted)}
 .bk-pill-val{font-size:.84rem;font-weight:700;color:var(--bk-text);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .bk-pill-label{font-size:.59rem;color:var(--bk-muted);font-weight:500;letter-spacing:.04em;text-align:center}
 .bk-section{padding:22px 24px 0}
@@ -796,9 +799,10 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
 }
 .bk-account:last-child{border-bottom:none}
 .bk-acc-icon{
-  width:40px;height:40px;border-radius:12px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:18px;
+  width:40px;height:40px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
 }
+.bk-acc-icon svg{width:20px;height:20px;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;fill:none;}
 .bk-acc-name{font-size:.85rem;font-weight:600;color:var(--bk-text2);flex:1}
 .bk-acc-sub{font-size:.65rem;color:var(--bk-muted);margin-top:2px}
 .bk-acc-val{font-size:.95rem;font-weight:700;color:var(--bk-text);letter-spacing:-.02em;font-variant-numeric:tabular-nums;text-align:right}
@@ -819,6 +823,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
 .bk-stat{
   background:var(--bk-surf);border:1px solid var(--bk-border);
   border-radius:12px;padding:14px 16px;
+  box-shadow:0 1px 4px rgba(13,27,46,.05);
 }
 .bk-stat-label{font-size:.59rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bk-muted);margin-bottom:6px}
 .bk-stat-val{font-size:1.08rem;font-weight:700;color:var(--bk-text);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
@@ -843,6 +848,57 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
   #bankInner{max-width:100%}
   .bk-hero-balance{font-size:clamp(32px,9vw,46px)}
 }
+/* Light mode refinements */
+#bankOverlay.bk-light .bk-stat{box-shadow:0 2px 8px rgba(13,27,46,.07)}
+#bankOverlay.bk-light .bk-pill{box-shadow:0 2px 8px rgba(13,27,46,.07)}
+#bankOverlay.bk-light .bk-account{border-bottom-color:#EEF1F6}
+#bankOverlay.bk-light .bk-hero{background:#F2F5FA}
+#bankOverlay.bk-light .bk-section-title{color:#7A8FA8;letter-spacing:.18em}
+#bankOverlay.bk-light .bk-acc-name{color:#1a2e48}
+#bankOverlay.bk-light .bk-stat-val{color:#0D1B2E}
+#bankOverlay.bk-light .bk-pill-val{color:#0D1B2E;font-weight:700}
+#bankOverlay.bk-light .bk-topbar{box-shadow:0 1px 0 #DDE3ED}
+#bankOverlay.bk-light .bk-bar-fill{background:linear-gradient(90deg,#1B4F99,#0E7C5A)}
+#bankOverlay.bk-light .bk-hero-balance{color:#0D1B2E}
+/* ── DIARIO CALENDAR ── */
+.dcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.dcal-dow{text-align:center;font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-bottom:6px}
+.dcal-cell{
+  border-radius:8px;padding:8px 6px 7px;min-height:64px;
+  border:1px solid var(--border);background:var(--surf);
+  cursor:pointer;transition:all .12s;position:relative;
+  display:flex;flex-direction:column;gap:3px;
+}
+.dcal-cell:hover{border-color:var(--acc);background:var(--acc-light)}
+.dcal-cell.empty{background:transparent;border-color:transparent;cursor:default;pointer-events:none}
+.dcal-cell.today{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.dcal-cell.has-data{background:var(--bg)}
+.dcal-cell.has-data:hover{background:var(--acc-light)}
+.dcal-num{font-size:.72rem;font-weight:700;color:var(--muted2);line-height:1}
+.dcal-cell.today .dcal-num{color:var(--acc);font-weight:800}
+.dcal-val{font-family:var(--fm);font-size:.75rem;font-weight:600;color:var(--text);line-height:1.2}
+.dcal-diff{font-size:.65rem;font-weight:600;line-height:1}
+.dcal-diff.pos{color:var(--good)}.dcal-diff.neg{color:var(--bad)}.dcal-diff.zero{color:var(--muted)}
+.dcal-cell.future{opacity:.4;pointer-events:none}
+
+/* Modal edición día */
+.dcal-modal-bg{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(13,27,46,.45);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+}
+.dcal-modal{
+  background:var(--surf);border:1px solid var(--border);border-radius:16px;
+  padding:24px 28px;width:min(360px,90vw);
+  box-shadow:var(--shadow-lg);
+}
+.dcal-modal h3{font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:4px}
+.dcal-modal .hint{font-size:.75rem;color:var(--muted);margin-bottom:16px}
+.dcal-modal-row{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.dcal-modal-row label{font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.dcal-modal-row input{width:100%;height:40px;font-size:1rem;font-family:var(--fm);font-weight:600;text-align:right}
+.dcal-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.dcal-modal-btns button{padding:8px 18px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--fb)}
 </style>
 </head>
 <body>
@@ -1147,6 +1203,22 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
       <button id="btnSaveGoals" class="bprim">💾 Guardar metas</button>
       <span class="hint">Si el tipo es “manual”, puedes marcarla como conseguida aunque no dependa de un importe.</span>
     </div>
+  </div></details>
+  <details class="acc"><summary><span class="chev">▶</span> Seguimiento diario</summary><div class="acontent">
+    <div class="controls" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <label class="pill">Mes:<input type="month" id="diarioMes" class="input" style="margin-left:8px"></label>
+      <button id="btnDiarioHoy" class="bsm">Ir a hoy</button>
+      <span class="hint" id="diarioMesLabel"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+      <div class="sbox"><div class="sval private-val" style="font-size:1rem" id="dkInicio">—</div><div class="slabel">Inicio mes</div></div>
+      <div class="sbox"><div class="sval private-val" style="font-size:1rem" id="dkFin">—</div><div class="slabel">Último día</div></div>
+      <div class="sbox"><div class="sval" style="font-size:1rem" id="dkDelta">—</div><div class="slabel">Variación mes</div></div>
+      <div class="sbox"><div class="sval" style="font-size:1rem" id="dkMaxDrop">—</div><div class="slabel">Peor día</div></div>
+    </div>
+    <div style="margin-bottom:16px"><div class="cw h200"><canvas id="chDiario"></canvas></div></div>
+    <div class="shdr" style="margin-bottom:8px"><div class="stitle">Calendario — haz clic en un día para editar</div></div>
+    <div id="diarioCal"></div>
   </div></details>
 </div>
 
@@ -2280,20 +2352,248 @@ function setupRetirada(){
 
 function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCharts(s);buildAccountList(s);buildRanking();buildStatKPIs(s);buildHeatmap(s);buildComp(s);buildProj(s);renderRetirada(s);makeSortable();}
 
+// ── DIARIO ──
+(function(){
+  const KEY='arturo_diario_v1';
+  // { 'YYYY-MM-DD': valor }
+  let diario=JSON.parse(localStorage.getItem(KEY)||'{}');
+  function save(){localStorage.setItem(KEY,JSON.stringify(diario));}
+
+  const fE=v=>isNaN(v)||v==null?'—':Number(v).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+  const fD=v=>{if(isNaN(v)||v==null)return'—';const s=v>=0?'+':'';return s+Number(v).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});};
+
+  function todayYM(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  function todayStr(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+  function daysInMonth(ym){const[y,m]=ym.split('-').map(Number);return new Date(y,m,0).getDate();}
+  function firstDow(ym){const[y,m]=ym.split('-').map(Number);return(new Date(y,m-1,1).getDay()+6)%7;} // 0=Mon
+
+  let currentYM=todayYM();
+
+  function getMonthData(ym){
+    const days=daysInMonth(ym);
+    const result=[];
+    for(let d=1;d<=days;d++){
+      const key=`${ym}-${String(d).padStart(2,'0')}`;
+      result.push({day:d,key,val:diario[key]??null});
+    }
+    return result;
+  }
+
+  function renderKpis(ym){
+    const days=getMonthData(ym).filter(d=>d.val!==null);
+    const vals=days.map(d=>d.val);
+    const inicio=vals[0]??null;
+    const fin=vals[vals.length-1]??null;
+    const delta=(inicio!=null&&fin!=null)?fin-inicio:null;
+
+    // Peor día (mayor caída)
+    let maxDrop=null;
+    for(let i=1;i<days.length;i++){
+      const diff=days[i].val-days[i-1].val;
+      if(maxDrop===null||diff<maxDrop) maxDrop=diff;
+    }
+
+    document.getElementById('dkInicio').textContent=fE(inicio);
+    document.getElementById('dkFin').textContent=fE(fin);
+    const dkD=document.getElementById('dkDelta');
+    dkD.textContent=fD(delta);
+    dkD.className='sval '+(delta==null?'':(delta>=0?'pos':'neg'));
+    const dkM=document.getElementById('dkMaxDrop');
+    dkM.textContent=maxDrop!=null?fD(maxDrop):'—';
+    dkM.className='sval '+(maxDrop==null?'':(maxDrop>=0?'pos':'neg'));
+
+    // label
+    const mn=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const[y,m]=ym.split('-').map(Number);
+    document.getElementById('diarioMesLabel').textContent=`${mn[m-1]} ${y}`;
+  }
+
+  function renderChart(ym){
+    if(typeof Chart==='undefined') return;
+    const days=getMonthData(ym);
+    const labels=days.filter(d=>d.val!==null).map(d=>String(d.day));
+    const vals=days.filter(d=>d.val!==null).map(d=>d.val);
+    const{grid,tick,line,fill}=mkd();
+    if(charts['chDiario']){charts['chDiario'].destroy();delete charts['chDiario'];}
+    if(!vals.length) return;
+    const ctx=document.getElementById('chDiario');
+    if(!ctx) return;
+    charts['chDiario']=new Chart(ctx,{
+      type:'line',
+      data:{labels,datasets:[{
+        data:vals,borderColor:line,backgroundColor:fill,
+        fill:true,tension:.3,pointRadius:3,pointHoverRadius:5,borderWidth:2,
+        pointBackgroundColor:line,
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'Patrimonio: '+fE(ctx.raw)}}},
+        scales:{x:{ticks:{color:tick},grid:{color:grid}},y:{ticks:{color:tick,callback:v=>fE(v)},grid:{color:grid}}}}
+    });
+  }
+
+  function renderCal(ym){
+    const cal=document.getElementById('diarioCal');
+    if(!cal) return;
+    const today=todayStr();
+    const days=getMonthData(ym);
+    const fd=firstDow(ym);
+    const dows=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+    // Previous day values for diff
+    const allKeys=Object.keys(diario).sort();
+
+    let html='<div class="dcal-grid">';
+    dows.forEach(d=>{ html+=`<div class="dcal-dow">${d}</div>`; });
+
+    // empty cells before first day
+    for(let i=0;i<fd;i++) html+='<div class="dcal-cell empty"></div>';
+
+    days.forEach(({day,key,val})=>{
+      const isToday=key===today;
+      const isFuture=key>today;
+      const hasData=val!==null;
+
+      // diff vs previous day with data
+      let diff=null;
+      if(hasData){
+        const prevKey=allKeys.filter(k=>k<key&&diario[k]!=null).pop();
+        if(prevKey!=null) diff=val-diario[prevKey];
+      }
+
+      let cls='dcal-cell';
+      if(isToday) cls+=' today';
+      if(isFuture) cls+=' future';
+      if(hasData) cls+=' has-data';
+
+      const valStr=hasData?`<div class="dcal-val private-val">${fE(val)}</div>`:'';
+      let diffStr='';
+      if(diff!==null){
+        const dc=diff>0?'pos':diff<0?'neg':'zero';
+        const ds=diff>=0?'↑':'↓';
+        diffStr=`<div class="dcal-diff ${dc}">${ds}${Math.abs(diff).toLocaleString('es-ES',{maximumFractionDigits:0})}</div>`;
+      }
+
+      html+=`<div class="${cls}" data-key="${key}" data-day="${day}">`+
+        `<div class="dcal-num">${day}</div>`+
+        valStr+diffStr+
+        `</div>`;
+    });
+    html+='</div>';
+    cal.innerHTML=html;
+
+    // click to edit
+    cal.querySelectorAll('.dcal-cell:not(.empty):not(.future)').forEach(cell=>{
+      cell.addEventListener('click',()=>openModal(cell.dataset.key,cell.dataset.day,ym));
+    });
+  }
+
+  // Modal
+  let modalBg=null;
+  function openModal(key,day,ym){
+    if(modalBg) modalBg.remove();
+    const mn=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const[y,m]=ym.split('-').map(Number);
+    const cur=diario[key]??'';
+
+    modalBg=document.createElement('div');
+    modalBg.className='dcal-modal-bg';
+    modalBg.innerHTML=`
+      <div class="dcal-modal">
+        <h3>Día ${day} — ${mn[m-1]} ${y}</h3>
+        <p class="hint">Introduce el patrimonio total de este día</p>
+        <div class="dcal-modal-row">
+          <label>Patrimonio total (€)</label>
+          <input type="number" id="dcalInput" value="${cur}" placeholder="Ej: 310000" step="1">
+        </div>
+        <div class="dcal-modal-btns">
+          ${cur!==''?`<button id="dcalDel" style="background:transparent;border:1px solid var(--border);color:var(--bad)">Borrar</button>`:''}
+          <button id="dcalCancel" style="background:transparent;border:1px solid var(--border);color:var(--muted2)">Cancelar</button>
+          <button id="dcalOk" class="bprim">Guardar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modalBg);
+
+    const input=modalBg.querySelector('#dcalInput');
+    input.focus();input.select();
+
+    modalBg.querySelector('#dcalCancel').onclick=()=>modalBg.remove();
+    modalBg.querySelector('#dcalDel')?.addEventListener('click',()=>{
+      delete diario[key];save();modalBg.remove();refresh(ym);
+    });
+    modalBg.querySelector('#dcalOk').onclick=()=>{
+      const v=parseFloat(input.value.replace(',','.').replace(/\./g,'').replace(',','.'));
+      if(isNaN(v)){input.focus();return;}
+      diario[key]=v;save();modalBg.remove();refresh(ym);
+    };
+    input.addEventListener('keydown',e=>{
+      if(e.key==='Enter') modalBg.querySelector('#dcalOk').click();
+      if(e.key==='Escape') modalBg.remove();
+    });
+    modalBg.addEventListener('click',e=>{if(e.target===modalBg)modalBg.remove();});
+  }
+
+  function refresh(ym){
+    renderKpis(ym);
+    renderChart(ym);
+    renderCal(ym);
+  }
+
+  function init(){
+    const sel=document.getElementById('diarioMes');
+    if(!sel) return;
+    sel.value=currentYM;
+    sel.addEventListener('change',()=>{currentYM=sel.value;refresh(currentYM);});
+    document.getElementById('btnDiarioHoy')?.addEventListener('click',()=>{
+      currentYM=todayYM();
+      sel.value=currentYM;
+      refresh(currentYM);
+    });
+    refresh(currentYM);
+  }
+
+  // Re-render when diario details opens
+  document.addEventListener('toggle', function(e){
+    if(e.target.closest('#tab-edicion') && e.target.open) setTimeout(()=>refresh(currentYM),50);
+  }, true);
+
+  // Expose for bank mode: get latest value
+  window._getDiarioHoy=function(){
+    const today=todayStr();
+    const keys=Object.keys(diario).filter(k=>diario[k]!=null).sort();
+    const yesterday=keys.filter(k=>k<=today).pop();
+    const prev=keys.filter(k=>k<(yesterday||'')).pop();
+    return{
+      val:yesterday?diario[yesterday]:null,
+      prev:prev?diario[prev]:null,
+      diff:(yesterday&&prev)?diario[yesterday]-diario[prev]:null,
+      date:yesterday||null
+    };
+  };
+
+  // Init when DOM ready
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+  else init();
+})();
+
 // ── BANK MODE ──
 (function(){
   const overlay=document.getElementById('bankOverlay');
   const inner=document.getElementById('bankInner');
   const btn=document.getElementById('btnBankMode');
 
-  const ICONS={
-    'Indexa Capital':'📈','Myinvestor':'📊','Degiro':'💹','DeGiro':'💹',
-    'Emergencia':'🛡️','Fondo de Emergencia':'🛡️','Efectivo':'💵',
-    'Vivienda':'🏠','Hipoteca':'🏦','Préstamo':'📋',
-  };
   function iconFor(name){
-    for(const k of Object.keys(ICONS)){if(name.toLowerCase().includes(k.toLowerCase()))return ICONS[k];}
-    return '◈';
+    const n=name.toLowerCase();
+    if(n.includes('indexa')||n.includes('myinvestor')||n.includes('degiro')||n.includes('bolsa')||n.includes('etf')||n.includes('fondo'))
+      return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`;
+    if(n.includes('hipotec')||n.includes('vivienda')||n.includes('casa')||n.includes('piso'))
+      return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>`;
+    if(n.includes('emergencia')||n.includes('reserva'))
+      return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+    if(n.includes('pension')||n.includes('pensión')||n.includes('jubilac'))
+      return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
+    if(n.includes('préstamo')||n.includes('prestamo')||n.includes('crédito')||n.includes('credito'))
+      return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+    return `<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`;
   }
   const ACC_COLORS=['rgba(27,79,153,.18)','rgba(14,124,90,.18)','rgba(124,58,237,.18)','rgba(180,83,9,.18)','rgba(219,39,119,.18)','rgba(13,148,136,.18)'];
   const fE=v=>isNaN(v)||v===undefined?'—':Math.abs(v).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
@@ -2330,15 +2630,15 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
       .sort((a,b)=>b.val-a.val);
 
     const isPrivacy=document.body.classList.contains('privacy');
-    const fEP=v=>isPrivacy?`<span style="filter:blur(12px);user-select:none;opacity:.15">${fE(v)}</span>`:fE(v);
+    const fEP=v=>isPrivacy?`<span style="filter:blur(8px);user-select:none;opacity:.35">${fE(v)}</span>`:fE(v);
     // beneficio/delta: SIEMPRE visible aunque privacy esté activo
 
     const patAbs=Math.abs(pat);
     const eurosRaw=Math.floor(patAbs).toLocaleString('es-ES');
-    const euros=isPrivacy?`<span style="filter:blur(18px);user-select:none;opacity:.12">${eurosRaw}</span>`:eurosRaw;
+    const euros=isPrivacy?`<span style="filter:blur(12px);user-select:none;opacity:.3">${eurosRaw}</span>`:eurosRaw;
     const neg=pat<0;
     const deltaClass=(!isNaN(delta)&&delta>=0)?'pos':'neg';
-    const deltaSymbol=(!isNaN(delta)&&delta>=0)?'▲':'▼';
+    const deltaSymbol=(!isNaN(delta)&&delta>=0)?'↑':'↓';
     const monthNames=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
     const ymParts=ym.split('-');
     const monthLabel=ymParts.length===2?`${monthNames[parseInt(ymParts[1])-1]} ${ymParts[0]}`:'';
@@ -2362,9 +2662,10 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
         else if(n.includes('pension')||n.includes('pensión')||n.includes('jubilac')) tagLabel='PENSIÓN';
         else tagLabel='AHORRO';
       }
+      const iconColor=acc.tipo==='pasivo'?'rgba(192,57,43,.7)':'rgba(27,79,153,.7)';
       accountsHTML+=`
       <div class="bk-account">
-        <div class="bk-acc-icon" style="background:${iconBg}">${iconFor(acc.name)}</div>
+        <div class="bk-acc-icon" style="background:${iconBg};color:${iconColor}">${iconFor(acc.name)}</div>
         <div style="flex:1;min-width:0">
           <div class="bk-acc-name">${acc.name}</div>
           <div class="bk-acc-sub">${acc.tipo==='pasivo'?'Financiación':'Patrimonio'}</div>
@@ -2408,17 +2709,17 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
       <div class="bk-hero-label">Balance total a ${nowStr}</div>
       <div class="bk-hero-balance">${neg?'−':''}${euros}<span class="bk-cents">€</span></div>
       ${!isNaN(delta)?`
-      <div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
         <span class="bk-hero-delta ${deltaClass}">${deltaSymbol} ${fE(Math.abs(delta))} este mes${!isNaN(deltaPct)?' ('+(deltaPct>=0?'+':'')+(deltaPct*100).toFixed(1).replace('.',',')+'%)':''}</span>
+        ${(()=>{const d=window._getDiarioHoy?.()??{};if(d.diff==null)return'';const dc=d.diff>=0?'pos':'neg';const ds=d.diff>=0?'↑':'↓';const ab=Math.abs(d.diff).toLocaleString('es-ES',{maximumFractionDigits:0});const pc=d.prev>0?' ('+ds+(d.diff/d.prev*100).toFixed(1).replace('.',',')+'%)':'';return`<span class="bk-hero-delta ${dc}" style="font-size:.72rem;padding:3px 11px">${ds} ${ab} €${pc} hoy</span>`;})()}
       </div>`:''}
-      <div class="bk-hero-date">${monthLabel}</div>
     </div>
 
-    <div class="bk-pills">
-      ${activos>0?`<div class="bk-pill"><div class="bk-pill-icon">📦</div><div class="bk-pill-val">${fEP(activos)}</div><div class="bk-pill-label">Activos</div></div>`:''}
-      ${cartera>0?`<div class="bk-pill"><div class="bk-pill-icon">📈</div><div class="bk-pill-val">${fEP(cartera)}</div><div class="bk-pill-label">Inversión</div></div>`:''}
-      ${hip>0?`<div class="bk-pill"><div class="bk-pill-icon">🏠</div><div class="bk-pill-val">${fEP(hip)}</div><div class="bk-pill-label">Hipoteca</div></div>`:''}
-      ${aportTotal>0?`<div class="bk-pill"><div class="bk-pill-icon">💰</div><div class="bk-pill-val">${fEP(aportTotal)}</div><div class="bk-pill-label">Aportado</div></div>`:''}
+    <div class="bk-pills" style="display:flex;flex-wrap:nowrap;gap:8px;padding:12px 16px;overflow-x:auto;justify-content:space-between">
+      ${activos>0?`<div class="bk-pill" style="min-width:0;flex:1;padding:10px 8px;gap:4px"><div class="bk-pill-icon" style="width:20px;height:20px"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/><path d="M12 12v4"/><path d="M10 14h4"/></svg></div><div class="bk-pill-val" style="font-size:.75rem">${fEP(activos)}</div><div class="bk-pill-label">Activos</div></div>`:''}
+      ${cartera>0?`<div class="bk-pill" style="min-width:0;flex:1;padding:10px 8px;gap:4px"><div class="bk-pill-icon" style="width:20px;height:20px"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div><div class="bk-pill-val" style="font-size:.75rem">${fEP(cartera)}</div><div class="bk-pill-label">Inversión</div></div>`:''}
+      ${hip>0?`<div class="bk-pill" style="min-width:0;flex:1;padding:10px 8px;gap:4px"><div class="bk-pill-icon" style="width:20px;height:20px"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg></div><div class="bk-pill-val" style="font-size:.75rem">${fEP(hip)}</div><div class="bk-pill-label">Hipoteca</div></div>`:''}
+      ${aportTotal>0?`<div class="bk-pill" style="min-width:0;flex:1;padding:10px 8px;gap:4px"><div class="bk-pill-icon" style="width:20px;height:20px"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg></div><div class="bk-pill-val" style="font-size:.75rem">${fEP(aportTotal)}</div><div class="bk-pill-label">Aportado</div></div>`:''}
     </div>
 
     ${activos>0?`
