@@ -1179,7 +1179,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
 <!-- EDICIÓN -->
 <div class="tpanel" id="tab-edicion">
   <div class="phdr"><div><div class="ptitle">Edición de <em>Datos</em></div><div class="psub">Introduce tus cifras el día 1 de cada mes</div></div></div>
-  <details class="acc" open><summary><span class="chev">▶</span> Zona de edición (mes / cuentas / importes)</summary><div class="acontent">
+  <details class="acc"><summary><span class="chev">▶</span> Zona de edición (mes / cuentas / importes)</summary><div class="acontent">
     <div class="controls" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <label class="pill">Mes:<input class="input" type="month" id="editMonth" style="margin-left:8px"></label>
       <button id="btnLoadPrev">Duplicar mes anterior</button>
@@ -1196,7 +1196,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
       <span class="hint">Se guarda automático en local y Google Sheets. Reset mes borra el mes completo.</span>
     </div>
   </div></details>
-  <details class="acc" open><summary><span class="chev">▶</span> Configuración de metas</summary><div class="acontent">
+  <details class="acc"><summary><span class="chev">▶</span> Configuración de metas</summary><div class="acontent">
     <div class="small" style="color:var(--muted);margin-bottom:12px">Estas metas son independientes de los importes mensuales. Puedes crear objetivos por patrimonio visible, cartera de inversión o equity vivienda. También puedes crear metas manuales.</div>
     <div class="goal-grid small" style="color:var(--muted);margin-bottom:6px"><div>Nombre</div><div>Tipo</div><div>Objetivo €</div><div>Base</div><div>Estado</div><div></div></div>
     <div id="goalRows" class="dz"></div>
@@ -1312,7 +1312,7 @@ function _normalizeSheetsResponse(j){
 
   const normalized={};
   Object.keys(root||{}).forEach(k=>{
-    if(k===UI_KEY){normalized[k]=root[k];return;}
+    if(k===UI_KEY||k==='__diario__'){normalized[k]=root[k];return;}
     if(/^\d{4}-\d{2}$/.test(k)){
       const v=root[k];
       if(v&&v.cuentas) normalized[k]=v;
@@ -2360,9 +2360,56 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
 // ── DIARIO ──
 (function(){
   const KEY='arturo_diario_v1';
+  const DIARIO_ACTION_KEY='__diario__';
   // { 'YYYY-MM-DD': valor }
   let diario=JSON.parse(localStorage.getItem(KEY)||'{}');
-  function save(){localStorage.setItem(KEY,JSON.stringify(diario));}
+
+  function save(){
+    localStorage.setItem(KEY,JSON.stringify(diario));
+    // Sync asíncrono a Sheets (no bloqueante)
+    saveDiarioToCloud().catch(()=>{});
+  }
+
+  async function saveDiarioToCloud(){
+    if(typeof postToAppsScript!=='function'||!cloudReady()) return;
+    // Guardamos el diario como si fuera un "mes" especial con clave __diario__
+    await postToAppsScript({action:'upsert',month:DIARIO_ACTION_KEY,cuentas:diario});
+  }
+
+  async function loadDiarioFromCloud(){
+    if(typeof postToAppsScript!=='function'||!cloudReady()) return;
+    return new Promise(resolve=>{
+      const cb='_gsd_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const script=document.createElement('script');
+      const tmt=setTimeout(()=>{delete window[cb];try{document.head.removeChild(script);}catch(_){}resolve();},10000);
+      window[cb]=function(j){
+        clearTimeout(tmt);delete window[cb];try{document.head.removeChild(script);}catch(_){}
+        // La respuesta es el objeto completo de Sheets; buscamos la clave especial __diario__
+        let remote=null;
+        if(j&&typeof j==='object'){
+          // Normalizar y buscar __diario__
+          let normalized=j;
+          if(typeof _normalizeSheetsResponse==='function') normalized=_normalizeSheetsResponse(j);
+          const entry=normalized[DIARIO_ACTION_KEY];
+          if(entry&&typeof entry==='object'){
+            // puede venir como {cuentas:{...}} o directamente {YYYY-MM-DD: val}
+            remote=entry.cuentas&&typeof entry.cuentas==='object'?entry.cuentas:entry;
+          }
+        }
+        if(remote&&typeof remote==='object'&&Object.keys(remote).length>0){
+          // Merge: datos remotos tienen prioridad sobre localStorage
+          diario=Object.assign({},diario,remote);
+          localStorage.setItem(KEY,JSON.stringify(diario));
+          console.log('Diario cargado desde Sheets: '+Object.keys(remote).length+' entradas');
+        }
+        resolve();
+      };
+      script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve();};
+      if(typeof GS==='string')
+        script.src=GS+'?action=getAll&callback='+cb+'&_='+Date.now();
+      document.head.appendChild(script);
+    });
+  }
 
   const fE=v=>isNaN(v)||v==null?'—':Number(v).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
   const fD=v=>{if(isNaN(v)||v==null)return'—';const s=v>=0?'+':'';return s+Number(v).toLocaleString('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});};
@@ -2577,6 +2624,8 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
       refresh(currentYM);
     });
     refresh(currentYM);
+    // Cargar datos remotos en segundo plano y re-renderizar si hay novedades
+    loadDiarioFromCloud().then(()=>refresh(currentYM)).catch(()=>{});
   }
 
   // Re-render when diario details opens
