@@ -2371,13 +2371,30 @@ function refreshAll(){const s=calcSeries();renderKPIs(s);renderTabla(s);buildCha
   }
 
   async function saveDiarioToCloud(){
-    if(typeof postToAppsScript!=='function'||!cloudReady()) return;
-    // Guardamos el diario como si fuera un "mes" especial con clave __diario__
-    await postToAppsScript({action:'upsert',month:DIARIO_ACTION_KEY,cuentas:diario});
+    if(!cloudReady()||typeof GS!=='string') return;
+    // Usamos JSONP (?p=) directamente: método verificado y sin problemas de CORS.
+    return new Promise(resolve=>{
+      const cb='_gsw_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const script=document.createElement('script');
+      const tmt=setTimeout(()=>{delete window[cb];try{document.head.removeChild(script);}catch(_){}resolve(false);},20000);
+      window[cb]=function(j){
+        clearTimeout(tmt);delete window[cb];try{document.head.removeChild(script);}catch(_){}
+        const ok=!!(j&&(j.ok||j.success||j.status==='ok'));
+        const dot=document.getElementById('syncDot');
+        if(dot){dot.classList.remove('syncing');if(!ok){dot.classList.add('error');setTimeout(()=>dot.classList.remove('error'),3000);}}
+        resolve(ok);
+      };
+      script.onerror=()=>{clearTimeout(tmt);delete window[cb];resolve(false);};
+      const dot=document.getElementById('syncDot');if(dot)dot.classList.add('syncing');
+      const payload={action:'upsert',month:DIARIO_ACTION_KEY,cuentas:diario};
+      const encoded=encodeURIComponent(JSON.stringify(payload));
+      script.src=GS+'?p='+encoded+'&callback='+cb+'&_='+Date.now();
+      document.head.appendChild(script);
+    });
   }
 
   async function loadDiarioFromCloud(){
-    if(typeof postToAppsScript!=='function'||!cloudReady()) return;
+    if(!cloudReady()||typeof GS!=='string') return;
     return new Promise(resolve=>{
       const cb='_gsd_'+Date.now()+'_'+Math.random().toString(36).slice(2);
       const script=document.createElement('script');
