@@ -345,7 +345,9 @@ main{grid-area:main;padding:22px 26px;display:flex;flex-direction:column;gap:18p
 @keyframes mpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 4px rgba(255,178,36,.12)}}
 
 /* HEATMAP */
-.hmgrid{display:grid;grid-template-columns:44px repeat(12,1fr);gap:3px;font-size:.62rem}
+.hmscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.hmgrid{display:grid;grid-template-columns:44px repeat(12,minmax(64px,1fr));gap:3px;font-size:.62rem;min-width:max-content}
+.hmlabel,.hmgrid>.hmlabel{position:sticky;left:0;z-index:3;background:var(--surf)}
 .hmcell{border-radius:5px;padding:5px 2px;text-align:center;font-weight:700;font-size:.59rem;cursor:default;transition:transform .1s;font-family:var(--fm)}
 .hmcell:hover{transform:scale(1.15);z-index:2;position:relative}
 .hmlabel{color:var(--muted);display:flex;align-items:center;justify-content:flex-end;padding-right:7px;font-size:.6rem;font-family:var(--fm)}
@@ -1058,7 +1060,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
       <div><div class="clabel" style="margin-bottom:2px">Mapa de calor — Rendimiento mensual</div><div class="small" style="color:var(--muted)">Verde = ganancia · Rojo = pérdida · Gris = sin datos</div></div>
       <div style="display:flex;gap:6px"><button class="hmtog on" id="hmEur">€</button><button class="hmtog" id="hmPct">%</button></div>
     </div>
-    <div class="hmgrid" id="hmGrid"></div>
+    <div class="hmscroll"><div class="hmgrid" id="hmGrid"></div></div>
   </div>
   <div id="hmtooltip"></div>
   <div class="card"><div class="clabel">Métricas de rendimiento</div>
@@ -2024,7 +2026,7 @@ function _renderHM(){
       const en=bY[yr][m];const cell=document.createElement('div');cell.className='hmcell';
       const val=en?(_hm==='eur'?en.eur:en.pct):undefined;
       if(val===undefined||isNaN(val)){cell.style.background=document.body.classList.contains('light')?'rgba(13,27,46,.05)':'rgba(255,255,255,.04)';cell.style.color='transparent';cell.textContent='·';}
-      else{const isL=document.body.classList.contains('light');const ratio=Math.min(Math.abs(val)/mxAbs,1);const alpha=0.15+ratio*0.75;if(val>=0){cell.style.background=isL?`rgba(14,124,90,${alpha})`:`rgba(0,255,159,${alpha})`;cell.style.color=alpha>0.5?'#fff':isL?'#0E7C5A':'#00ff9f';}else{cell.style.background=isL?`rgba(192,57,43,${alpha})`:`rgba(255,69,69,${alpha})`;cell.style.color='#fff';}if(_hm==='eur'){const sg=val>=0?'+':'';cell.textContent=sg+(Math.abs(val)>=1000?(val/1000).toFixed(1)+'k':Math.round(val));}else{const sg=val>=0?'+':'';cell.textContent=sg+val.toFixed(1)+'%';}}
+      else{const isL=document.body.classList.contains('light');const ratio=Math.min(Math.abs(val)/mxAbs,1);const alpha=0.15+ratio*0.75;if(val>=0){cell.style.background=isL?`rgba(14,124,90,${alpha})`:`rgba(0,255,159,${alpha})`;cell.style.color=alpha>0.5?'#fff':isL?'#0E7C5A':'#00ff9f';}else{cell.style.background=isL?`rgba(192,57,43,${alpha})`:`rgba(255,69,69,${alpha})`;cell.style.color='#fff';}if(_hm==='eur'){const n=Math.round(val);const sg=n<0?'-':'+';cell.textContent=sg+String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');}else{const sg=val>=0?'+':'';cell.textContent=sg+val.toFixed(1)+'%';}}
       cell.addEventListener('mouseenter',e=>{if(!tip||val===undefined||isNaN(val)){if(tip)tip.style.display='none';return;}const eT=isNaN(en.eur)?'—':fmtEUR(Math.round(en.eur));const pT=isNaN(en.pct)?'—':(en.pct>=0?'+':'')+en.pct.toFixed(2).replace('.',',')+' %';const col=val>=0?(document.body.classList.contains('light')?'#0E7C5A':'#00ff9f'):(document.body.classList.contains('light')?'#C0392B':'#ff4545');const ym2=`${yr}-${String(m+1).padStart(2,'0')}`;tip.innerHTML=`<span style="color:var(--muted2);font-size:.68rem">${ym2}</span><br><span style="color:${col}">${eT} · ${pT}</span>`;tip.style.display='block';_posTip(e);});
       cell.addEventListener('mousemove',e=>_posTip(e));cell.addEventListener('mouseleave',()=>{if(tip)tip.style.display='none';});
       g.appendChild(cell);
