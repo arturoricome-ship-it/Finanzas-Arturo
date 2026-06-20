@@ -1012,7 +1012,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
   </div></details>
   <div class="g2">
     <div class="card">
-      <div class="shdr"><div class="stitle">Evolución del Patrimonio Neto</div><button id="btnLogScale" class="bsm" onclick="toggleLogScale()" title="Suaviza visualmente los saltos grandes (como aportaciones puntuales) sin tocar los datos. Afecta a este gráfico y al de Cartera vs. Hipoteca.">📈 Escala lineal</button></div>
+      <div class="shdr"><div class="stitle">Evolución del Patrimonio Neto</div></div>
       <div class="cw h320"><canvas id="chPatBig"></canvas></div>
     </div>
     <div class="card">
@@ -1764,21 +1764,6 @@ var _OCULTO_MESES={
 };
 function _ocultoMonto(ym){return Number(_OCULTO_MESES[ym])||0;}
 function _apSumVisible(s){return s.labels.reduce((acc,ym,idx)=>acc+((Number(s.ap[idx])||0)-_ocultoMonto(ym)),0);}
-
-// ─── Escala logarítmica opcional para gráficos de Patrimonio/Cartera vs Hipoteca ──
-// Solo afecta a la VISUALIZACIÓN del eje Y (suaviza saltos grandes como
-// aportaciones puntuales). Los datos reales no cambian en absoluto.
-let _logScale=(localStorage.getItem('cta_logscale')==='1');
-function toggleLogScale(){
-  _logScale=!_logScale;
-  localStorage.setItem('cta_logscale',_logScale?'1':'0');
-  _syncLogScaleBtn();
-  if(typeof refreshAll==='function')refreshAll();
-}
-function _syncLogScaleBtn(){
-  const btn=document.getElementById('btnLogScale');
-  if(btn)btn.textContent=_logScale?'📉 Escala logarítmica':'📈 Escala lineal';
-}
 function isEmpty(ym){const ex=data[ym]?.cuentas&&Object.keys(data[ym].cuentas).length>0;const t=mTotals(ym);return!ex||(t.A===0&&t.P===0&&t.pat===0&&t.ap===0);}
 function calcSeries(){
   const months=getRange();
@@ -1955,10 +1940,9 @@ function mkChart(id,cfg){if(typeof Chart==='undefined')return;if(charts[id])char
 
 function buildCharts(s){
   if(typeof Chart==='undefined')return;
-  _syncLogScaleBtn();
   const{grid,tick,line,fill,pos,neg,aport}=mkd();const labels=s.labels.slice();const lR=labels.map(ym=>addM(ym,-1));
 
-  mkChart('chPatBig',{type:'line',data:{labels,datasets:[{label:'Patrimonio',data:s.pat,borderColor:line,backgroundColor:fill,fill:true,tension:.3,pointRadius:0,borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>'Patrimonio: '+fmtEUR(ctx.raw)}}},scales:{x:{ticks:{color:tick,maxTicksLimit:8},grid:{color:grid}},y:{type:_logScale?'logarithmic':'linear',ticks:{color:tick,callback:v=>fmtEUR(v)},grid:{color:grid}}}}});
+  mkChart('chPatBig',{type:'line',data:{labels,datasets:[{label:'Patrimonio',data:s.pat,borderColor:line,backgroundColor:fill,fill:true,tension:.3,pointRadius:0,borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>'Patrimonio: '+fmtEUR(ctx.raw)}}},scales:{x:{ticks:{color:tick,maxTicksLimit:8},grid:{color:grid}},y:{ticks:{color:tick,callback:v=>fmtEUR(v)},grid:{color:grid}}}}});
 
   // Crossover
   buildCrossover(s,labels,tick,grid);
@@ -1990,7 +1974,7 @@ function buildCrossover(s,labels,tick,grid){
     {label:'Hipoteca restante',data:s.hip,borderColor:document.body.classList.contains('light')?'#C0392B':'#ff4545',backgroundColor:neg.replace('.65)','.06)'),fill:true,tension:.3,pointRadius:0,borderWidth:2,borderDash:[6,4]},
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
     plugins:{legend:{position:'top',labels:{color:tick,boxWidth:8,font:{size:10},padding:14}}},
-    scales:{x:{ticks:{color:tick,maxTicksLimit:8},grid:{color:grid}},y:{type:_logScale?'logarithmic':'linear',ticks:{color:tick,callback:v=>fmtEUR(v)},grid:{color:grid}}}}});
+    scales:{x:{ticks:{color:tick,maxTicksLimit:8},grid:{color:grid}},y:{ticks:{color:tick,callback:v=>fmtEUR(v)},grid:{color:grid}}}}});
 }
 
 function buildAccountList(s){
