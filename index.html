@@ -1759,8 +1759,9 @@ function mTotals(ym){const cs=(data[ym]&&data[ym].cuentas)?data[ym].cuentas:{};l
 // ─── Camuflaje de aportaciones puntuales (inyecciones de capital) ──
 // Importes fijos a camuflar, mes a mes. Para añadir otro mes en el
 // futuro, solo hay que añadir una línea más, ej: '2026-09':50000
+// Marzo 2026 quitado: el dato base (patrimonio/aportación) ya no refleja
+// el ingreso, así que restar aquí solo generaba el -98k/-99k visible.
 var _OCULTO_MESES={
-  '2026-03':100000
 };
 function _ocultoMonto(ym){return Number(_OCULTO_MESES[ym])||0;}
 function _apSumVisible(s){return s.labels.reduce((acc,ym,idx)=>acc+((Number(s.ap[idx])||0)-_ocultoMonto(ym)),0);}
