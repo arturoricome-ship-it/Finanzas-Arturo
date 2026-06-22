@@ -1762,7 +1762,19 @@ function mTotals(ym){const cs=(data[ym]&&data[ym].cuentas)?data[ym].cuentas:{};l
 var _OCULTO_MESES={
   '2026-03':100000
 };
-function _ocultoMonto(ym){return Number(_OCULTO_MESES[ym])||0;}
+function _ocultoMonto(ym){
+  const m=Number(_OCULTO_MESES[ym])||0;
+  if(!m) return 0;
+  // Solo se aplica si la cuenta que realmente trae el importe (fondo de
+  // emergencia/reserva) sigue marcada/incluida ese mes. Si la desmarcas,
+  // esos 100k ya no están en los totales y no hay que restar nada.
+  const cs=(data[ym]&&data[ym].cuentas)?data[ym].cuentas:{};
+  for(const n of Object.keys(cs)){
+    const nl=n.toLowerCase();
+    if((nl.includes('emergencia')||nl.includes('reserva'))&&isIncluded(n)) return m;
+  }
+  return 0;
+}
 function _apSumVisible(s){return s.labels.reduce((acc,ym,idx)=>acc+((Number(s.ap[idx])||0)-_ocultoMonto(ym)),0);}
 function isEmpty(ym){const ex=data[ym]?.cuentas&&Object.keys(data[ym].cuentas).length>0;const t=mTotals(ym);return!ex||(t.A===0&&t.P===0&&t.pat===0&&t.ap===0);}
 function calcSeries(){
