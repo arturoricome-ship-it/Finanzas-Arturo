@@ -1194,6 +1194,7 @@ body.light #btnBankMode:hover{background:var(--bg2);border-color:var(--border)}
     </div>
     <div class="controls" style="margin-top:10px;gap:8px">
       <button id="btnAdd">+ Añadir fila</button>
+      <button id="btnVenta">🧮 Registrar venta</button>
       <button id="btnGuardar" class="bprim">💾 Guardar ahora</button>
       <span class="hint">Se guarda automático en local y Google Sheets. Reset mes borra el mes completo.</span>
     </div>
@@ -1639,6 +1640,116 @@ function collectCurrentMonth(forcedYm=null){
 }
 let _autoSaveTimer=null;
 let _monthDirty=false;
+
+// ─── Registrar venta: calcula IRPF del ahorro y ajusta aportaciones ──
+function calcIRPFAhorro(gananciaNueva,gananciaPrevia){
+  const tramos=[[6000,.19],[50000,.21],[200000,.23],[300000,.27],[Infinity,.30]];
+  function impuestoAcumulado(base){
+    if(base<=0)return 0;
+    let imp=0,prev=0;
+    for(const[lim,tipo]of tramos){
+      if(base<=prev)break;
+      const tramoBase=Math.min(base,lim)-prev;
+      imp+=tramoBase*tipo;
+      prev=lim;
+      if(base<=lim)break;
+    }
+    return imp;
+  }
+  return impuestoAcumulado(gananciaPrevia+gananciaNueva)-impuestoAcumulado(gananciaPrevia);
+}
+function _findRowAny(nombre){
+  const nl=(nombre||'').trim().toLowerCase();
+  if(!nl)return null;
+  return[...ui.ra.querySelectorAll('.ge.rowline'),...ui.rp.querySelectorAll('.ge.rowline')]
+    .find(d=>(d.querySelector('.nombre').value||'').trim().toLowerCase()===nl);
+}
+function aplicarVenta(v){
+  const rOrigen=_findRowAny(v.origen);
+  if(!rOrigen){alert(`No encuentro la cuenta "${v.origen}" en el mes actual. Añádela primero (o "Duplicar mes anterior") y vuelve a intentarlo.`);return false;}
+  const inpO=rOrigen.querySelector('.aport');
+  inpO.value=((parseFloat(inpO.value)||0)-v.importe).toFixed(2);
+  inpO.dispatchEvent(new Event('input',{bubbles:true}));
+
+  if(!v.fuera&&v.destino){
+    const rDestino=_findRowAny(v.destino);
+    if(!rDestino){alert(`No encuentro la cuenta destino "${v.destino}" en el mes actual. Añádela primero.`);return false;}
+    const inpD=rDestino.querySelector('.aport');
+    inpD.value=((parseFloat(inpD.value)||0)+v.importe).toFixed(2);
+    inpD.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+
+  if(v.impuesto>0){
+    const year=(ui.em.value||'').slice(0,4)||String(new Date().getFullYear());
+    const nombrePasivo=`IRPF pendiente ${year}`;
+    let rPas=_findRowAny(nombrePasivo);
+    if(!rPas){
+      const b=document.createElement('div');
+      b.innerHTML=rowHTML(nombrePasivo,'pasivo',0,0);
+      rPas=b.firstElementChild;
+      attachRow(rPas,'pasivo');
+      ui.rp.appendChild(rPas);
+    }
+    const inpV=rPas.querySelector('.valor');
+    inpV.value=((parseFloat(inpV.value)||0)+v.impuesto).toFixed(2);
+    inpV.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  scheduleAutoSave();
+  return true;
+}
+function openVentaModal(){
+  if(document.querySelector('.dcal-modal-bg'))return;
+  const ym=ui.em.value;
+  if(!ym){alert('Selecciona primero el mes en el editor.');return;}
+  const bg=document.createElement('div');
+  bg.className='dcal-modal-bg';
+  bg.innerHTML=`
+    <div class="dcal-modal" style="width:min(440px,92vw)">
+      <h3>🧮 Registrar venta / retirada</h3>
+      <div class="hint">Mes: <b>${ym}</b>. Calcula el IRPF estimado y ajusta las aportaciones de las cuentas implicadas.</div>
+      <div class="dcal-modal-row"><label>Cuenta de origen</label><input list="dlC" id="vtOrigen" class="input" placeholder="Ej: Indexa Capital" style="text-align:left"></div>
+      <div class="dcal-modal-row"><label>Importe retirado (€)</label><input type="number" step="0.01" id="vtImporte" class="input"></div>
+      <div class="dcal-modal-row"><label>Ganancia incluida en esa retirada (€)</label><input type="number" step="0.01" id="vtGanancia" class="input"></div>
+      <div class="dcal-modal-row"><label>Ganancias ya realizadas este año (antes de esta venta)</label><input type="number" step="0.01" id="vtPrevia" class="input" value="0"></div>
+      <div class="dcal-modal-row">
+        <label style="flex-direction:row;display:flex;align-items:center;gap:8px;text-transform:none;font-weight:500;font-size:.8rem">
+          <input type="checkbox" id="vtFuera" style="width:auto;height:auto;accent-color:var(--green)"> El dinero sale del sistema (no se queda en ninguna cuenta trackeada)
+        </label>
+      </div>
+      <div class="dcal-modal-row" id="vtDestinoWrap"><label>Cuenta destino</label><input list="dlC" id="vtDestino" class="input" placeholder="Ej: Cuenta corriente" style="text-align:left"></div>
+      <div id="vtResultado" style="background:var(--bg);border-radius:10px;padding:10px 12px;font-size:.82rem;margin-bottom:12px;display:none;line-height:1.5"></div>
+      <div class="dcal-modal-btns">
+        <button id="vtCancel">Cancelar</button>
+        <button id="vtCalc" class="bprim">Calcular</button>
+        <button id="vtOk" class="bprim" style="display:none">Aplicar al mes</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  const $=sel=>bg.querySelector(sel);
+  $('#vtFuera').addEventListener('change',()=>{$('#vtDestinoWrap').style.display=$('#vtFuera').checked?'none':'';});
+  $('#vtCancel').addEventListener('click',()=>bg.remove());
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.remove();});
+  let impuestoCalc=0;
+  $('#vtCalc').addEventListener('click',()=>{
+    const ganancia=parseFloat($('#vtGanancia').value)||0;
+    const previa=parseFloat($('#vtPrevia').value)||0;
+    impuestoCalc=calcIRPFAhorro(ganancia,previa);
+    const r=$('#vtResultado');
+    r.style.display='';
+    r.innerHTML=`Ganancia de esta venta: <b>${fmtEUR(ganancia)}</b><br>IRPF estimado a provisionar: <b style="color:var(--bad)">${fmtEUR(impuestoCalc)}</b><br><span class="hint">Tipo marginal efectivo sobre esta venta: ${(ganancia>0?(impuestoCalc/ganancia*100):0).toFixed(1)}%</span>`;
+    $('#vtOk').style.display='';
+  });
+  $('#vtOk').addEventListener('click',()=>{
+    const importe=parseFloat($('#vtImporte').value)||0;
+    const origen=$('#vtOrigen').value.trim();
+    const fuera=$('#vtFuera').checked;
+    const destino=$('#vtDestino').value.trim();
+    if(!origen){alert('Indica la cuenta de origen.');return;}
+    if(importe<=0){alert('Indica el importe retirado.');return;}
+    const ok=aplicarVenta({origen,importe,destino,fuera,impuesto:impuestoCalc});
+    if(ok){bg.remove();alert('Aplicado en el formulario. Revisa las filas y pulsa "💾 Guardar ahora" cuando lo confirmes.');}
+  });
+}
 function scheduleAutoSave(){
   _monthDirty=true;
   clearTimeout(_autoSaveTimer);
@@ -1695,6 +1806,7 @@ function bindEvents(){
   document.getElementById('btnAddGoal')?.addEventListener('click',()=>{goals.push({id:'g-'+Date.now(),name:'Nueva meta',kind:'amount',target:100000,base:'patrimonio',done:false});renderGoalsEditor();scheduleGoalsSave();});
   document.getElementById('btnSaveGoals')?.addEventListener('click',()=>saveGoalsNow(true));
   document.getElementById('btnGuardar').addEventListener('click',onGuardar);
+  document.getElementById('btnVenta').addEventListener('click',openVentaModal);
   document.getElementById('btnLoadPrev').addEventListener('click',dupPrev);
   document.getElementById('editMonth').addEventListener('focus',e=>{e.target.dataset.prev=e.target.value||'';});
   document.getElementById('editMonth').addEventListener('change',async e=>{
